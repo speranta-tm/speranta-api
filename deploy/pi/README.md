@@ -4,11 +4,11 @@ Two environments run on the Pi, each a systemd service behind nginx with its own
 
 | | stage | prod |
 |---|---|---|
-| URL | https://speranta-api-stage.thorsp.net | https://speranta-api.thorsp.net |
+| URL | https://sperantatm-api-stage.thorsp.net | https://sperantatm-api.thorsp.net |
 | Deployed by | a green `ci.yml` run of a push to `main`, if it's still main's tip | a green `release.yml` run for a `vX.Y.Z` release on `main`, newer than the live one |
 | Service / user | `speranta-api-stage` as `speranta-stage` (127.0.0.1:5095) | `speranta-api` as `speranta-prod` (127.0.0.1:5094) |
 | Database | `speranta_stage` | `speranta_prod` |
-| Web client | https://staging.speranta-web.pages.dev (and PR previews) | https://speranta.thorsp.net |
+| Web client | https://staging.speranta-web.pages.dev (and PR previews) | https://sperantatm.thorsp.net |
 
 So: merge a PR and it is on **stage** a few minutes later. When stage looks right, publish a
 **GitHub Release** `vX.Y.Z` from `main` and it goes to **prod**.
