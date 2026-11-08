@@ -12,6 +12,7 @@ public sealed record BookOrderRequest(
     string? BookSlug,
     string? FullName,
     string? Phone,
+    DeliveryMethod? DeliveryMethod,
     string? Address,
     AgeGroup? AgeGroup,
     bool? HasBibleAtHome,
@@ -50,7 +51,9 @@ public sealed record KidsGroupDto(string Label, TimeOnly Start, TimeOnly End);
 
 public sealed record FlyerDto(string Url, string FileName, DateTimeOffset UploadedAt, long SizeBytes);
 
-public sealed record BookDto(string Slug, string Title, bool IsAvailable);
+public sealed record BookDto(
+    string Slug, string Title, bool IsAvailable,
+    bool AsksAgeGroup, bool AsksBibleAtHome, bool AllowsPickup, bool IsForChildren);
 
 public sealed record SiteInfo(
     IReadOnlyList<ServiceTimeDto> Services,
@@ -78,7 +81,7 @@ public sealed record BookOrderRow(
 public sealed record BookOrderDetail(
     int Id, DateTimeOffset CreatedAt, DateTimeOffset UpdatedAt, string FullName, string Phone,
     string BookSlug, string BookTitle, DeliveryMethod DeliveryMethod, string? Address,
-    AgeGroup AgeGroup, bool HasBibleAtHome, OrderStatus Status, string? InternalNote,
+    AgeGroup? AgeGroup, bool? HasBibleAtHome, OrderStatus Status, string? InternalNote,
     IReadOnlyList<ActivityDto> History);
 
 public sealed record UpdateBookOrderRequest(

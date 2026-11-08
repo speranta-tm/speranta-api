@@ -18,6 +18,22 @@ public class Book
     public bool IsAvailable { get; set; } = true;
 
     public int SortOrder { get; set; }
+
+    // Each book's form asks slightly different things, exactly as the design (and
+    // the old site) does. The flags live here so the API and the web client agree
+    // on what is required.
+
+    /// <summary>The form asks "Grupa de vârstă" (the adult books).</summary>
+    public bool AsksAgeGroup { get; set; }
+
+    /// <summary>The form asks "Aveți Biblie în casă?" (only the Bible).</summary>
+    public bool AsksBibleAtHome { get; set; }
+
+    /// <summary>The form offers pickup from the church (the children's books).</summary>
+    public bool AllowsPickup { get; set; }
+
+    /// <summary>Shows the "Pentru copii" label.</summary>
+    public bool IsForChildren { get; set; }
 }
 
 public class BookOrder
@@ -38,10 +54,11 @@ public class BookOrder
     /// <summary>Required while the order is for delivery.</summary>
     public string? Address { get; set; }
 
-    public AgeGroup AgeGroup { get; set; }
+    /// <summary>Null when the book's form does not ask it.</summary>
+    public AgeGroup? AgeGroup { get; set; }
 
-    /// <summary>"Aveți Biblie în casă?"</summary>
-    public bool HasBibleAtHome { get; set; }
+    /// <summary>"Aveți Biblie în casă?" Null when the book's form does not ask it.</summary>
+    public bool? HasBibleAtHome { get; set; }
 
     public OrderStatus Status { get; set; } = OrderStatus.New;
 

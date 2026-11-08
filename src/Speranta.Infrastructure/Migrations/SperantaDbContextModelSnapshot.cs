@@ -326,9 +326,25 @@ namespace Speranta.Infrastructure.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
+                    b.Property<bool>("AllowsPickup")
+                        .HasColumnType("boolean")
+                        .HasColumnName("allows_pickup");
+
+                    b.Property<bool>("AsksAgeGroup")
+                        .HasColumnType("boolean")
+                        .HasColumnName("asks_age_group");
+
+                    b.Property<bool>("AsksBibleAtHome")
+                        .HasColumnType("boolean")
+                        .HasColumnName("asks_bible_at_home");
+
                     b.Property<bool>("IsAvailable")
                         .HasColumnType("boolean")
                         .HasColumnName("is_available");
+
+                    b.Property<bool>("IsForChildren")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_for_children");
 
                     b.Property<string>("Slug")
                         .IsRequired()
@@ -359,7 +375,11 @@ namespace Speranta.Infrastructure.Migrations
                         new
                         {
                             Id = 1,
+                            AllowsPickup = false,
+                            AsksAgeGroup = true,
+                            AsksBibleAtHome = true,
                             IsAvailable = true,
+                            IsForChildren = false,
                             Slug = "biblia",
                             SortOrder = 1,
                             Title = "Biblia"
@@ -367,7 +387,11 @@ namespace Speranta.Infrastructure.Migrations
                         new
                         {
                             Id = 2,
+                            AllowsPickup = false,
+                            AsksAgeGroup = true,
+                            AsksBibleAtHome = false,
                             IsAvailable = true,
+                            IsForChildren = false,
                             Slug = "viata-lui-isus",
                             SortOrder = 2,
                             Title = "Viața lui Isus"
@@ -375,7 +399,11 @@ namespace Speranta.Infrastructure.Migrations
                         new
                         {
                             Id = 3,
+                            AllowsPickup = false,
+                            AsksAgeGroup = true,
+                            AsksBibleAtHome = false,
                             IsAvailable = true,
+                            IsForChildren = false,
                             Slug = "tragedia-veacurilor",
                             SortOrder = 3,
                             Title = "Tragedia veacurilor"
@@ -383,7 +411,11 @@ namespace Speranta.Infrastructure.Migrations
                         new
                         {
                             Id = 4,
+                            AllowsPickup = false,
+                            AsksAgeGroup = true,
+                            AsksBibleAtHome = false,
                             IsAvailable = true,
+                            IsForChildren = false,
                             Slug = "calea-catre-hristos",
                             SortOrder = 4,
                             Title = "Calea către Hristos"
@@ -391,7 +423,11 @@ namespace Speranta.Infrastructure.Migrations
                         new
                         {
                             Id = 5,
+                            AllowsPickup = true,
+                            AsksAgeGroup = false,
+                            AsksBibleAtHome = false,
                             IsAvailable = true,
+                            IsForChildren = true,
                             Slug = "biblia-pentru-elevi",
                             SortOrder = 5,
                             Title = "Biblia pentru elevi"
@@ -399,7 +435,11 @@ namespace Speranta.Infrastructure.Migrations
                         new
                         {
                             Id = 6,
+                            AllowsPickup = true,
+                            AsksAgeGroup = false,
+                            AsksBibleAtHome = false,
                             IsAvailable = true,
+                            IsForChildren = true,
                             Slug = "mesajul-lui-dumnezeu-pentru-tine",
                             SortOrder = 6,
                             Title = "Mesajul lui Dumnezeu pentru tine"
@@ -421,7 +461,6 @@ namespace Speranta.Infrastructure.Migrations
                         .HasColumnName("address");
 
                     b.Property<string>("AgeGroup")
-                        .IsRequired()
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)")
                         .HasColumnName("age_group");
@@ -446,7 +485,7 @@ namespace Speranta.Infrastructure.Migrations
                         .HasColumnType("character varying(100)")
                         .HasColumnName("full_name");
 
-                    b.Property<bool>("HasBibleAtHome")
+                    b.Property<bool?>("HasBibleAtHome")
                         .HasColumnType("boolean")
                         .HasColumnName("has_bible_at_home");
 

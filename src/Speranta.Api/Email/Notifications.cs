@@ -26,9 +26,10 @@ public sealed class Notifications(IMailOutbox outbox, IOptions<EmailOptions> opt
             ("Carte", book.Title),
             ("Nume", order.FullName),
             ("Telefon", order.Phone),
+            ("Primire", Labels.Of(order.DeliveryMethod)),
             ("Adresă", order.Address ?? "—"),
-            ("Grupa de vârstă", Labels.Of(order.AgeGroup)),
-            ("Are Biblie acasă", Labels.YesNo(order.HasBibleAtHome)),
+            ("Grupa de vârstă", order.AgeGroup is { } age ? Labels.Of(age) : "—"),
+            ("Are Biblie acasă", order.HasBibleAtHome is { } has ? Labels.YesNo(has) : "—"),
         ],
         $"admin/comenzi/{order.Id}");
 

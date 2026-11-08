@@ -184,15 +184,20 @@ internal static class Seed
 {
     public static readonly Book[] Books =
     [
-        new() { Id = 1, Slug = "biblia", Title = "Biblia", SortOrder = 1 },
-        new() { Id = 2, Slug = "viata-lui-isus", Title = "Viața lui Isus", SortOrder = 2 },
-        new() { Id = 3, Slug = "tragedia-veacurilor", Title = "Tragedia veacurilor", SortOrder = 3 },
-        new() { Id = 4, Slug = "calea-catre-hristos", Title = "Calea către Hristos", SortOrder = 4 },
-        new() { Id = 5, Slug = "biblia-pentru-elevi", Title = "Biblia pentru elevi", SortOrder = 5 },
+        new() { Id = 1, Slug = "biblia", Title = "Biblia", SortOrder = 1, AsksAgeGroup = true, AsksBibleAtHome = true },
+        new() { Id = 2, Slug = "viata-lui-isus", Title = "Viața lui Isus", SortOrder = 2, AsksAgeGroup = true },
+        new() { Id = 3, Slug = "tragedia-veacurilor", Title = "Tragedia veacurilor", SortOrder = 3, AsksAgeGroup = true },
+        new() { Id = 4, Slug = "calea-catre-hristos", Title = "Calea către Hristos", SortOrder = 4, AsksAgeGroup = true },
+        new()
+        {
+            Id = 5, Slug = "biblia-pentru-elevi", Title = "Biblia pentru elevi", SortOrder = 5,
+            AllowsPickup = true, IsForChildren = true,
+        },
         new()
         {
             Id = 6, Slug = "mesajul-lui-dumnezeu-pentru-tine",
             Title = "Mesajul lui Dumnezeu pentru tine", SortOrder = 6,
+            AllowsPickup = true, IsForChildren = true,
         },
     ];
 
