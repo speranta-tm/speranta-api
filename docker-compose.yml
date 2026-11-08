@@ -1,0 +1,32 @@
+# Local development database only. Production runs its own Postgres.
+#
+# Port 5434: Amicus's dev database already uses 5433 and VerseMate 5432, and
+# running them side by side should not be a choice anyone has to make.
+name: speranta
+
+services:
+  postgres:
+    image: postgres:18-alpine
+    container_name: speranta-postgres
+    environment:
+      POSTGRES_DB: speranta
+      POSTGRES_USER: speranta
+      POSTGRES_PASSWORD: speranta_dev
+    ports:
+      # 127.0.0.1 on purpose: a bare "5434:5432" binds every interface, and Docker's
+      # published ports bypass host firewalls, so the LAN could reach this database
+      # with the password written in this file.
+      - "127.0.0.1:5434:5432"
+    volumes:
+      # The parent of the data dir: Postgres 18+ images keep data in a per-version
+      # subdirectory and refuse to start on the old mount point.
+      - speranta-pgdata:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U speranta -d speranta"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+volumes:
+  speranta-pgdata:
