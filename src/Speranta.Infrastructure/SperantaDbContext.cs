@@ -32,6 +32,10 @@ public class SperantaDbContext(DbContextOptions<SperantaDbContext> options)
 
     public DbSet<AdminInvite> AdminInvites => Set<AdminInvite>();
 
+    public DbSet<OutboxEmail> Outbox => Set<OutboxEmail>();
+
+    public DbSet<MailStatus> MailStatus => Set<MailStatus>();
+
     protected override void OnModelCreating(ModelBuilder builder)
     {
         base.OnModelCreating(builder);
@@ -153,6 +157,28 @@ public class SperantaDbContext(DbContextOptions<SperantaDbContext> options)
             e.HasOne(x => x.FlyerFile).WithMany().HasForeignKey(x => x.FlyerFileId)
                 .OnDelete(DeleteBehavior.SetNull);
             e.HasData(new SiteSettings { Id = SiteSettings.SingletonId, KidsPhone = "0764 915 396" });
+        });
+
+        builder.Entity<OutboxEmail>(e =>
+        {
+            e.ToTable("outbox_emails");
+            e.Property(x => x.To).HasMaxLength(Limits.Email);
+            e.Property(x => x.Subject).HasMaxLength(300);
+            e.Property(x => x.LastError).HasMaxLength(1000);
+            e.Property(x => x.Kind).HasConversion<string>().HasMaxLength(20);
+
+            // The sender's one query: what is due and not yet sent.
+            e.HasIndex(x => x.NextAttemptAt).HasFilter("sent_at IS NULL");
+            e.HasIndex(x => new { x.Kind, x.SubmissionId });
+        });
+
+        builder.Entity<MailStatus>(e =>
+        {
+            e.ToTable("mail_status", t => t.HasCheckConstraint(
+                "ck_mail_status_singleton", $"id = {Speranta.Domain.Entities.MailStatus.SingletonId}"));
+            e.Property(x => x.Id).ValueGeneratedNever();
+            e.Property(x => x.LastError).HasMaxLength(1000);
+            e.HasData(new MailStatus { Id = Speranta.Domain.Entities.MailStatus.SingletonId });
         });
 
         builder.Entity<AdminInvite>(e =>

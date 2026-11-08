@@ -30,4 +30,8 @@
     <ImplicitUsings>enable</ImplicitUsings>
   </PropertyGroup>
 
+  <ItemGroup>
+    <InternalsVisibleTo Include="Speranta.Api.Tests" />
+  </ItemGroup>
+
 </Project>

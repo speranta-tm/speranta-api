@@ -22,7 +22,8 @@ public sealed class SperantaAppFactory : WebApplicationFactory<Program>
     private const string TestDatabase = "speranta_test";
     public const string Password = "correct-horse-battery";
 
-    public RecordingOutbox Mail { get; } = new();
+    /// <summary>Stands in for Gmail: records what it was asked to send, and can be told to refuse.</summary>
+    public FakeMailTransport Mail { get; } = new();
 
     public TestClock Clock { get; } = new(DateTimeOffset.Parse("2026-11-08T09:00:00Z"));
 
@@ -58,8 +59,13 @@ public sealed class SperantaAppFactory : WebApplicationFactory<Program>
 
         builder.ConfigureServices(services =>
         {
-            services.RemoveAll<IMailOutbox>();
-            services.AddSingleton<IMailOutbox>(Mail);
+            services.RemoveAll<IMailTransport>();
+            services.AddSingleton<IMailTransport>(Mail);
+
+            // No background sender in tests: they run a delivery pass when they
+            // want one (DeliverMailAsync), so nothing depends on timing.
+            var sender = services.Single(d => d.ImplementationType == typeof(MailSenderService));
+            services.Remove(sender);
 
             services.RemoveAll<TimeProvider>();
             services.AddSingleton<TimeProvider>(Clock);
@@ -93,18 +99,20 @@ public sealed class SperantaAppFactory : WebApplicationFactory<Program>
     /// <summary>Empties what tests write and puts the seeded content back as it ships.</summary>
     public async Task ResetAsync()
     {
-        Mail.Sent.Clear();
+        Mail.Reset();
         Clock.Set(DateTimeOffset.Parse("2026-11-08T09:00:00Z"));
 
         using var scope = Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<SperantaDbContext>();
 
         await db.Database.ExecuteSqlRawAsync(
-            "truncate book_orders, kids_signups, contact_messages, activity, announcements, admin_invites, "
+            "truncate book_orders, kids_signups, contact_messages, activity, announcements, admin_invites, outbox_emails, "
             + "users, user_roles, user_logins, user_claims, user_tokens restart identity cascade;"
             + "update books set is_available = true, sort_order = id;"
             + "update site_settings set flyer_file_id = null, flyer_downloads = 0, kids_phone = '0764 915 396';"
-            + "delete from files;");
+            + "delete from files;"
+            + "update mail_status set last_success_at = null, last_failure_at = null, last_error = null, "
+            + "last_check_at = null, last_check_ok = null;");
     }
 
     /// <summary>An admin account, signed in, as a bearer client.</summary>
@@ -130,6 +138,19 @@ public sealed class SperantaAppFactory : WebApplicationFactory<Program>
         var token = (await login.Content.ReadFromJsonAsync<TokenPayload>())!.AccessToken;
         client.DefaultRequestHeaders.Authorization = new("Bearer", token);
         return client;
+    }
+
+    /// <summary>Everything queued in the outbox so far, sent or not, oldest first.</summary>
+    public List<OutgoingMail> Outbox() => Db(db => db.Outbox.OrderBy(m => m.Id).ToList()
+        .Select(m => new OutgoingMail(m.To, m.Subject, m.HtmlBody,
+            m.Kind is { } k && m.SubmissionId is { } id ? (k, id) : null))
+        .ToList());
+
+    /// <summary>One pass of the background sender.</summary>
+    public async Task<int> DeliverMailAsync()
+    {
+        using var scope = Services.CreateScope();
+        return await scope.ServiceProvider.GetRequiredService<MailDelivery>().ProcessDueAsync(CancellationToken.None);
     }
 
     public T Db<T>(Func<SperantaDbContext, T> read)
@@ -158,17 +179,35 @@ public sealed class SperantaAppFactory : WebApplicationFactory<Program>
     private sealed record TokenPayload(string AccessToken);
 }
 
-public sealed class RecordingOutbox : IMailOutbox
+public sealed class FakeMailTransport : IMailTransport
 {
-    public List<OutgoingMail> Sent { get; } = [];
+    public List<OutgoingMail> Delivered { get; } = [];
 
-    public void Enqueue(OutgoingMail mail)
+    /// <summary>Set to make every send and sign-in fail, like an expired Gmail password.</summary>
+    public string? FailWith { get; set; }
+
+    public bool IsConfigured { get; set; } = true;
+
+    public void Reset()
     {
-        lock (Sent)
-        {
-            Sent.Add(mail);
-        }
+        Delivered.Clear();
+        FailWith = null;
+        IsConfigured = true;
     }
+
+    public Task SendAsync(OutgoingMail mail, CancellationToken ct)
+    {
+        if (FailWith is not null)
+        {
+            throw new InvalidOperationException(FailWith);
+        }
+
+        Delivered.Add(mail);
+        return Task.CompletedTask;
+    }
+
+    public Task CheckAsync(CancellationToken ct) =>
+        FailWith is null ? Task.CompletedTask : throw new InvalidOperationException(FailWith);
 }
 
 public sealed class TestClock(DateTimeOffset start) : TimeProvider

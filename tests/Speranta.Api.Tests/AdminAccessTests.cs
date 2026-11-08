@@ -39,7 +39,7 @@ public sealed partial class AdminAccessTests(AppFixture fixture) : AppTest(fixtu
         (await marc.PostAsJsonAsync("/admin/admins/invites", new { email = "voluntar@speranta.test" }))
             .EnsureSuccessStatusCode();
 
-        var token = TokenFrom(Assert.Single(App.Mail.Sent).HtmlBody);
+        var token = TokenFrom(Assert.Single(App.Outbox()).HtmlBody);
         var anon = App.CreateClient();
 
         var info = await anon.GetFromJsonAsync<JsonElement>($"/invites/{token}");
@@ -66,7 +66,7 @@ public sealed partial class AdminAccessTests(AppFixture fixture) : AppTest(fixtu
     {
         var marc = await App.AdminClientAsync();
         await marc.PostAsJsonAsync("/admin/admins/invites", new { email = "late@speranta.test" });
-        var token = TokenFrom(Assert.Single(App.Mail.Sent).HtmlBody);
+        var token = TokenFrom(Assert.Single(App.Outbox()).HtmlBody);
 
         App.Clock.Advance(TimeSpan.FromDays(7) + TimeSpan.FromMinutes(1));
 
@@ -82,8 +82,8 @@ public sealed partial class AdminAccessTests(AppFixture fixture) : AppTest(fixtu
         await marc.PostAsJsonAsync("/admin/admins/invites", new { email = "twice@speranta.test" });
         await marc.PostAsJsonAsync("/admin/admins/invites", new { email = "twice@speranta.test" });
 
-        var first = TokenFrom(App.Mail.Sent[0].HtmlBody);
-        var second = TokenFrom(App.Mail.Sent[1].HtmlBody);
+        var first = TokenFrom(App.Outbox()[0].HtmlBody);
+        var second = TokenFrom(App.Outbox()[1].HtmlBody);
         var anon = App.CreateClient();
 
         Assert.Equal(HttpStatusCode.NotFound, (await anon.GetAsync($"/invites/{first}")).StatusCode);
@@ -128,7 +128,7 @@ public sealed partial class AdminAccessTests(AppFixture fixture) : AppTest(fixtu
         await StartupTasks.RunAsync(App.Services, config, NullLogger.Instance);
         await StartupTasks.RunAsync(App.Services, config, NullLogger.Instance);
 
-        var mail = Assert.Single(App.Mail.Sent);
+        var mail = Assert.Single(App.Outbox());
         Assert.Equal("first@speranta.test", mail.To);
     }
 

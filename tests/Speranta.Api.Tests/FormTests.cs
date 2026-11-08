@@ -39,7 +39,7 @@ public sealed class FormTests(AppFixture fixture) : AppTest(fixture)
         var history = App.Db(db => db.Activity.Where(a => a.SubmissionId == id).Select(a => a.Text).ToList());
         Assert.Equal(["Comandă primită de pe site"], history);
 
-        var mail = Assert.Single(App.Mail.Sent);
+        var mail = Assert.Single(App.Outbox());
         Assert.Equal("speranta.azs.tm@gmail.com", mail.To);
         Assert.Contains("Biblia", mail.Subject);
         Assert.Contains($"https://site.test/admin/comenzi/{id}", mail.HtmlBody);
@@ -63,7 +63,7 @@ public sealed class FormTests(AppFixture fixture) : AppTest(fixture)
 
         (await App.CreateClient().PostAsJsonAsync("/forms/book-orders", order)).EnsureSuccessStatusCode();
 
-        var body = Assert.Single(App.Mail.Sent).HtmlBody;
+        var body = Assert.Single(App.Outbox()).HtmlBody;
         Assert.DoesNotContain("<script>", body);
         Assert.DoesNotContain("href=\"https://evil.test\"", body);
         Assert.Contains("&lt;script&gt;", body);
@@ -89,7 +89,7 @@ public sealed class FormTests(AppFixture fixture) : AppTest(fixture)
         }
 
         Assert.Equal("Numărul de telefon nu pare corect.", errors.GetProperty("phone")[0].GetString());
-        Assert.Empty(App.Mail.Sent);
+        Assert.Empty(App.Outbox());
         Assert.Equal(0, App.Db(db => db.BookOrders.Count()));
     }
 
@@ -198,7 +198,7 @@ public sealed class FormTests(AppFixture fixture) : AppTest(fixture)
 
         response.EnsureSuccessStatusCode();
         Assert.Equal(0, App.Db(db => db.BookOrders.Count()));
-        Assert.Empty(App.Mail.Sent);
+        Assert.Empty(App.Outbox());
     }
 
     [Fact]
@@ -216,7 +216,7 @@ public sealed class FormTests(AppFixture fixture) : AppTest(fixture)
         var signup = App.Db(db => db.KidsSignups.Single());
         Assert.Null(signup.ChildFirstName);
         Assert.Null(signup.ChildAge);
-        Assert.Single(App.Mail.Sent);
+        Assert.Single(App.Outbox());
     }
 
     [Fact]

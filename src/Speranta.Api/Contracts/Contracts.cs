@@ -76,13 +76,15 @@ public sealed record ActivityDto(DateTimeOffset At, string Text);
 
 public sealed record BookOrderRow(
     int Id, DateTimeOffset CreatedAt, string FullName, string Phone, string BookSlug,
-    string BookTitle, DeliveryMethod DeliveryMethod, string? Address, OrderStatus Status);
+    string BookTitle, DeliveryMethod DeliveryMethod, string? Address, OrderStatus Status,
+    bool EmailPending = false);
 
 public sealed record BookOrderDetail(
     int Id, DateTimeOffset CreatedAt, DateTimeOffset UpdatedAt, string FullName, string Phone,
     string BookSlug, string BookTitle, DeliveryMethod DeliveryMethod, string? Address,
     AgeGroup? AgeGroup, bool? HasBibleAtHome, OrderStatus Status, string? InternalNote,
-    IReadOnlyList<ActivityDto> History);
+    IReadOnlyList<ActivityDto> History,
+    bool EmailPending = false);
 
 public sealed record UpdateBookOrderRequest(
     OrderStatus? Status, DeliveryMethod? DeliveryMethod, string? Address, string? InternalNote);
@@ -90,25 +92,33 @@ public sealed record UpdateBookOrderRequest(
 public sealed record KidsSignupRow(
     int Id, DateTimeOffset CreatedAt, string ParentName, string Phone, string? Email,
     string? ChildFirstName, int? ChildAge, string? Group, bool ParticipatedBefore,
-    string? Message, SignupStatus Status);
+    string? Message, SignupStatus Status,
+    bool EmailPending = false);
 
 public sealed record KidsSignupDetail(
     int Id, DateTimeOffset CreatedAt, DateTimeOffset UpdatedAt, string ParentName, string Phone,
     string? Email, string? ChildFirstName, int? ChildAge, string? Group, bool ParticipatedBefore,
-    string? Message, SignupStatus Status, string? InternalNote, IReadOnlyList<ActivityDto> History);
+    string? Message, SignupStatus Status, string? InternalNote, IReadOnlyList<ActivityDto> History,
+    bool EmailPending = false);
 
 public sealed record UpdateKidsSignupRequest(SignupStatus? Status, string? InternalNote);
 
 public sealed record ContactMessageRow(
     int Id, DateTimeOffset CreatedAt, string Name, string Email, string? Subject,
-    string Preview, MessageStatus Status);
+    string Preview, MessageStatus Status,
+    bool EmailPending = false);
 
 public sealed record ContactMessageDetail(
     int Id, DateTimeOffset CreatedAt, string? FirstName, string? LastName, string Email,
-    string? Subject, string Body, MessageStatus Status, IReadOnlyList<ActivityDto> History);
+    string? Subject, string Body, MessageStatus Status, IReadOnlyList<ActivityDto> History,
+    bool EmailPending = false);
 
 public sealed record UpdateContactMessageRequest(MessageStatus Status);
 
+/// <summary>
+/// <c>EmailPending</c> on rows and details: the notification for this submission has
+/// not gone out yet (Gmail refused, or SMTP is not set up). It is retried until it does.
+/// </summary>
 /// <summary>A list page plus the count behind every status tab ("Noi (2)").</summary>
 public sealed record SubmissionList<TRow, TStatus>(
     IReadOnlyList<TRow> Items, int Total, int PageNumber, int PageSize,

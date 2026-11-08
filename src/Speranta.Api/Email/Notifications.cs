@@ -18,7 +18,7 @@ public sealed class Notifications(IMailOutbox outbox, IOptions<EmailOptions> opt
 {
     private readonly EmailOptions _options = options.Value;
 
-    public void NewBookOrder(BookOrder order, Book book) => Notify(
+    public Task NewBookOrderAsync(BookOrder order, Book book, CancellationToken ct) => NotifyAsync(ct,
         SubmissionKind.BookOrder, order.Id,
         $"Comandă nouă: {book.Title} – {order.FullName}",
         $"Comandă nouă #{order.Id}",
@@ -33,7 +33,7 @@ public sealed class Notifications(IMailOutbox outbox, IOptions<EmailOptions> opt
         ],
         $"admin/comenzi/{order.Id}");
 
-    public void NewKidsSignup(KidsSignup signup) => Notify(
+    public Task NewKidsSignupAsync(KidsSignup signup, CancellationToken ct) => NotifyAsync(ct,
         SubmissionKind.KidsSignup, signup.Id,
         $"Înscriere nouă la activitățile pentru copii – {signup.ParentName}",
         "Înscriere nouă la activitățile pentru copii",
@@ -47,12 +47,12 @@ public sealed class Notifications(IMailOutbox outbox, IOptions<EmailOptions> opt
         ],
         $"admin/inscrieri/{signup.Id}");
 
-    public void NewContactMessage(ContactMessage message)
+    public Task NewContactMessageAsync(ContactMessage message, CancellationToken ct)
     {
         var name = string.Join(' ', new[] { message.FirstName, message.LastName }
             .Where(s => !string.IsNullOrWhiteSpace(s)));
 
-        Notify(
+        return NotifyAsync(ct,
             SubmissionKind.ContactMessage, message.Id,
             $"Mesaj nou de pe site: {message.Subject ?? "(fără subiect)"}",
             "Mesaj nou de pe site",
@@ -64,16 +64,16 @@ public sealed class Notifications(IMailOutbox outbox, IOptions<EmailOptions> opt
             $"admin/mesaje/{message.Id}");
     }
 
-    public void AdminInvite(string email, string token, string? invitedBy)
+    public Task AdminInviteAsync(string email, string token, string? invitedBy, CancellationToken ct)
     {
         var link = Link($"admin/invitatie?token={Uri.EscapeDataString(token)}");
         var who = string.IsNullOrWhiteSpace(invitedBy) ? "Cineva" : WebUtility.HtmlEncode(invitedBy);
 
-        outbox.Enqueue(new OutgoingMail(email, "Invitație: administrare site Speranța Timișoara",
+        return outbox.EnqueueAsync(new OutgoingMail(email, "Invitație: administrare site Speranța Timișoara",
             Wrap($"<p>Bună,</p><p>{who} te-a invitat să administrezi site-ul bisericii "
                 + "Speranța Timișoara.</p>"
                 + $"<p><a href=\"{link}\">Acceptă invitația și alege o parolă</a></p>"
-                + "<p>Linkul este valabil 7 zile. Dacă nu te așteptai la acest email, îl poți ignora.</p>")));
+                + "<p>Linkul este valabil 7 zile. Dacă nu te așteptai la acest email, îl poți ignora.</p>")), ct);
     }
 
     private static string ChildText(KidsSignup s) => (s.ChildFirstName, s.ChildAge) switch
@@ -84,8 +84,8 @@ public sealed class Notifications(IMailOutbox outbox, IOptions<EmailOptions> opt
         ({ } n, { } a) => $"{n}, {a} ani",
     };
 
-    private void Notify(
-        SubmissionKind kind, int id, string subject, string heading,
+    private Task NotifyAsync(
+        CancellationToken ct, SubmissionKind kind, int id, string subject, string heading,
         (string Label, string Value)[] rows, string adminPath)
     {
         var html = new StringBuilder();
@@ -104,7 +104,7 @@ public sealed class Notifications(IMailOutbox outbox, IOptions<EmailOptions> opt
         html.Append("</table>");
         html.Append($"<p><a href=\"{Link(adminPath)}\">Deschide în panoul de administrare</a></p>");
 
-        outbox.Enqueue(new OutgoingMail(_options.NotifyTo, subject, Wrap(html.ToString()), (kind, id)));
+        return outbox.EnqueueAsync(new OutgoingMail(_options.NotifyTo, subject, Wrap(html.ToString()), (kind, id)), ct);
     }
 
     private string Link(string path) => $"{_options.WebUrl.TrimEnd('/')}/{path}";
@@ -121,7 +121,7 @@ public sealed class Notifications(IMailOutbox outbox, IOptions<EmailOptions> opt
 /// /auth/forgotPassword actually deliver; without one it succeeds and sends nothing.
 /// Transient, because MapIdentityApi resolves it from the root provider.
 /// </summary>
-public sealed class IdentityEmailSender(IMailOutbox outbox, IOptions<EmailOptions> options)
+public sealed class IdentityEmailSender(IServiceScopeFactory scopes, IOptions<EmailOptions> options)
     : IEmailSender<AppUser>
 {
     private readonly EmailOptions _options = options.Value;
@@ -133,16 +133,16 @@ public sealed class IdentityEmailSender(IMailOutbox outbox, IOptions<EmailOption
     public Task SendPasswordResetLinkAsync(AppUser user, string email, string resetLink) =>
         SendPasswordResetCodeAsync(user, email, resetLink);
 
-    public Task SendPasswordResetCodeAsync(AppUser user, string email, string resetCode)
+    public async Task SendPasswordResetCodeAsync(AppUser user, string email, string resetCode)
     {
         var link = $"{_options.WebUrl.TrimEnd('/')}/admin/resetare-parola"
             + $"?email={Uri.EscapeDataString(email)}&code={Uri.EscapeDataString(resetCode)}";
 
-        outbox.Enqueue(new OutgoingMail(email, "Resetare parolă – site Speranța Timișoara",
+        await using var scope = scopes.CreateAsyncScope();
+        var outbox = scope.ServiceProvider.GetRequiredService<IMailOutbox>();
+        await outbox.EnqueueAsync(new OutgoingMail(email, "Resetare parolă – site Speranța Timișoara",
             "<div style=\"font-family:Inter,Arial,sans-serif;font-size:15px;color:#1A202C\">"
             + $"<p>Bună,</p><p><a href=\"{link}\">Alege o parolă nouă</a>.</p>"
-            + "<p>Dacă nu ai cerut tu asta, ignoră acest email.</p></div>"));
-
-        return Task.CompletedTask;
+            + "<p>Dacă nu ai cerut tu asta, ignoră acest email.</p></div>"), CancellationToken.None);
     }
 }

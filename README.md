@@ -31,10 +31,28 @@ or `Cancelled`; sign-ups `New → Contacted → Enrolled` or `Withdrawn`; messag
 Romanian labels (Nou, Confirmat, Livrat, Ridicat, Anulat …).
 
 Every submission is saved first, then announced by email to `Email:NotifyTo`
-(speranta.azs.tm@gmail.com). Mail goes through an in-memory outbox drained by a
-background service, so a visitor never waits on SMTP and a mail failure never loses a
-submission. A line "Email trimis la …" lands in the submission's history only after the
-email actually went out.
+(speranta.azs.tm@gmail.com).
+
+### Email that can't silently stop
+
+The old WordPress site sent through WP Mail SMTP's Google sign-in, whose permission
+expired every few days (an OAuth app left in Google's "Testing" mode): emails stopped
+without a sign, the notifications from those days were lost, and someone had to test the
+form daily. Here:
+
+- **Gmail app password over SMTP**, not a sign-in permission: it does not expire, and stops
+  only if the account password changes or 2-Step Verification is turned off.
+- **A database outbox** (`outbox_emails`). The request only queues the email; a background
+  sender delivers it. A refused send is retried (1, 5, 15, 30 min, then hourly, without
+  end), so once the problem is fixed every missed notification arrives. Restarts lose nothing.
+- **A sign-in check every 6 hours** (`Email:CheckIntervalHours`) without sending anything, so
+  a dead password shows up even on a day with no orders.
+- **The admin sees it.** `GET /admin/mail-status` drives a warning banner on every admin page
+  (`Ok`, `Failing` since when and why, `NotConfigured`); `POST /admin/mail-status/check`
+  checks now and sends what is waiting; `POST /admin/mail-status/test` sends a test email.
+  Each submission carries `emailPending`, and its history gets "Email trimis la …" only once
+  the email really went out.
+- Nothing is lost either way: every submission is in the admin before any email is tried.
 
 **Spam:** each form carries a hidden `website` field (a honeypot, as on the old site): a
 bot that fills it gets the same 200 and nothing is saved. Forms are also rate-limited per
