@@ -1,0 +1,10 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Speranta.Api/Speranta.Api.csproj" />
+    <Project Path="src/Speranta.Domain/Speranta.Domain.csproj" />
+    <Project Path="src/Speranta.Infrastructure/Speranta.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Speranta.Api.Tests/Speranta.Api.Tests.csproj" />
+  </Folder>
+</Solution>

@@ -1,0 +1,64 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+# A new push supersedes the run in flight for the same branch.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-test:
+    name: build & test
+    runs-on: ubuntu-latest
+
+    # A real Postgres, not an in-memory provider: ILIKE search, check constraints,
+    # seeded sequences and ExecuteUpdate are Postgres behaviour a fake would skip.
+    services:
+      postgres:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_DB: postgres
+          POSTGRES_USER: speranta
+          POSTGRES_PASSWORD: speranta_dev
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U speranta -d postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      SPERANTA_TEST_POSTGRES: Host=localhost;Port=5432;Database=postgres;Username=speranta;Password=speranta_dev
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: '10.0.x'
+
+      - run: dotnet restore
+
+      # Code warnings fail the build; NuGet audit warnings (NU19xx) only warn, so a
+      # new advisory against a transitive package can't block every PR overnight.
+      - name: Build
+        run: dotnet build --no-restore -c Release -warnaserror -warnnotaserror:NU1901,NU1902,NU1903,NU1904
+
+      - name: Test
+        run: dotnet test --no-build --configuration Release
+
+      # A model change without its migration would build and pass here, then fail
+      # on the first deploy. This catches it in the PR.
+      - name: Migrations are up to date
+        run: |
+          dotnet tool restore
+          dotnet dotnet-ef migrations has-pending-model-changes \
+            -p src/Speranta.Infrastructure -s src/Speranta.Api --no-build --configuration Release
