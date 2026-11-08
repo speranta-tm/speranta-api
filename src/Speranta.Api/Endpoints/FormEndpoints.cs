@@ -31,22 +31,6 @@ public static class FormEndpoints
             var v = new Validation();
             var name = v.Text("fullName", req.FullName, Limits.Name, true, "Scrieți numele complet.");
             var phone = v.Phone("phone", req.Phone, required: true);
-            var address = v.Text("address", req.Address, Limits.Address, true, "Scrieți adresa completă.");
-
-            if (req.AgeGroup is null || !Enum.IsDefined(req.AgeGroup.Value))
-            {
-                v.Add("ageGroup", "Alegeți grupa de vârstă.");
-            }
-
-            if (req.HasBibleAtHome is null)
-            {
-                v.Add("hasBibleAtHome", "Alegeți un răspuns.");
-            }
-
-            v.MustAccept("acceptsDeliveryArea", req.AcceptsDeliveryArea,
-                "Confirmați că locuiți în Timișoara sau împrejurimi.");
-            v.MustAccept("acceptsDataUse", req.AcceptsDataUse,
-                "Avem nevoie de acordul dvs. pentru a vă putea livra cartea.");
 
             var book = string.IsNullOrWhiteSpace(req.BookSlug)
                 ? null
@@ -61,6 +45,32 @@ public static class FormEndpoints
                 v.Add("bookSlug", "Ne pare rău, această carte nu mai este în stoc.");
             }
 
+            var method = req.DeliveryMethod ?? DeliveryMethod.Delivery;
+            if (!Enum.IsDefined(method) || (method == DeliveryMethod.Pickup && book is { AllowsPickup: false }))
+            {
+                v.Add("deliveryMethod", "Această carte se poate doar livra.");
+            }
+
+            // The address only matters when someone drives there.
+            var address = method == DeliveryMethod.Delivery
+                ? v.Text("address", req.Address, Limits.Address, true, "Scrieți adresa completă.")
+                : null;
+
+            if (book is { AsksAgeGroup: true } && (req.AgeGroup is null || !Enum.IsDefined(req.AgeGroup.Value)))
+            {
+                v.Add("ageGroup", "Alegeți grupa de vârstă.");
+            }
+
+            if (book is { AsksBibleAtHome: true } && req.HasBibleAtHome is null)
+            {
+                v.Add("hasBibleAtHome", "Alegeți un răspuns.");
+            }
+
+            v.MustAccept("acceptsDeliveryArea", req.AcceptsDeliveryArea,
+                "Confirmați că locuiți în Timișoara sau împrejurimi.");
+            v.MustAccept("acceptsDataUse", req.AcceptsDataUse,
+                "Avem nevoie de acordul dvs. pentru a vă putea livra cartea.");
+
             if (!v.IsValid)
             {
                 return v.Problem();
@@ -72,9 +82,12 @@ public static class FormEndpoints
                 BookId = book!.Id,
                 FullName = name!,
                 Phone = phone!,
+                DeliveryMethod = method,
                 Address = address,
-                AgeGroup = req.AgeGroup!.Value,
-                HasBibleAtHome = req.HasBibleAtHome!.Value,
+                // Only what this book's form asked is kept, so a crafted request can't
+                // put an answer nobody was asked on the record.
+                AgeGroup = book.AsksAgeGroup ? req.AgeGroup : null,
+                HasBibleAtHome = book.AsksBibleAtHome ? req.HasBibleAtHome : null,
                 CreatedAt = now,
                 UpdatedAt = now,
             };

@@ -106,6 +106,92 @@ public sealed class FormTests(AppFixture fixture) : AppTest(fixture)
     }
 
     [Fact]
+    public async Task A_childrens_book_can_be_picked_up_without_an_address_or_age_group()
+    {
+        var response = await App.CreateClient().PostAsJsonAsync("/forms/book-orders", new
+        {
+            bookSlug = "biblia-pentru-elevi",
+            fullName = "Maria Ionescu",
+            phone = "0723 456 789",
+            deliveryMethod = "Pickup",
+            acceptsDeliveryArea = true,
+            acceptsDataUse = true,
+        });
+
+        response.EnsureSuccessStatusCode();
+        var order = App.Db(db => db.BookOrders.Single());
+        Assert.Equal(DeliveryMethod.Pickup, order.DeliveryMethod);
+        Assert.Null(order.Address);
+        Assert.Null(order.AgeGroup);
+        Assert.Null(order.HasBibleAtHome);
+    }
+
+    [Fact]
+    public async Task Only_the_childrens_books_offer_pickup()
+    {
+        var response = await App.CreateClient().PostAsJsonAsync("/forms/book-orders", new
+        {
+            bookSlug = "viata-lui-isus",
+            fullName = "Ion Popescu",
+            phone = "0712 345 678",
+            deliveryMethod = "Pickup",
+            ageGroup = "Over70",
+            acceptsDeliveryArea = true,
+            acceptsDataUse = true,
+        });
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        var errors = (await response.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("errors");
+        Assert.True(errors.TryGetProperty("deliveryMethod", out _));
+    }
+
+    [Fact]
+    public async Task Each_book_requires_only_what_its_form_asks()
+    {
+        // Viața lui Isus asks the age group but not the Bible question.
+        var isus = await App.CreateClient().PostAsJsonAsync("/forms/book-orders", new
+        {
+            bookSlug = "viata-lui-isus",
+            fullName = "Ion Popescu",
+            phone = "0712 345 678",
+            address = "Str. Exemplu 1",
+            ageGroup = "Over70",
+            hasBibleAtHome = true, // not asked: must not be stored
+            acceptsDeliveryArea = true,
+            acceptsDataUse = true,
+        });
+        isus.EnsureSuccessStatusCode();
+        Assert.Null(App.Db(db => db.BookOrders.Single().HasBibleAtHome));
+
+        // A children's book delivered still needs the address.
+        var elevi = await App.CreateClient().PostAsJsonAsync("/forms/book-orders", new
+        {
+            bookSlug = "biblia-pentru-elevi",
+            fullName = "Ion Popescu",
+            phone = "0712 345 678",
+            deliveryMethod = "Delivery",
+            acceptsDeliveryArea = true,
+            acceptsDataUse = true,
+        });
+        Assert.Equal(HttpStatusCode.BadRequest, elevi.StatusCode);
+        var errors = (await elevi.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("errors");
+        Assert.True(errors.TryGetProperty("address", out _));
+        Assert.False(errors.TryGetProperty("ageGroup", out _));
+    }
+
+    [Fact]
+    public async Task The_site_tells_the_client_what_each_book_form_asks()
+    {
+        var site = await App.CreateClient().GetFromJsonAsync<JsonElement>("/site");
+        var books = site.GetProperty("books").EnumerateArray().ToDictionary(b => b.GetProperty("slug").GetString()!);
+
+        Assert.True(books["biblia"].GetProperty("asksBibleAtHome").GetBoolean());
+        Assert.False(books["viata-lui-isus"].GetProperty("asksBibleAtHome").GetBoolean());
+        Assert.True(books["biblia-pentru-elevi"].GetProperty("allowsPickup").GetBoolean());
+        Assert.True(books["mesajul-lui-dumnezeu-pentru-tine"].GetProperty("isForChildren").GetBoolean());
+    }
+
+    [Fact]
     public async Task The_honeypot_answers_like_success_but_keeps_nothing()
     {
         var response = await App.CreateClient().PostAsJsonAsync("/forms/book-orders", ValidOrder(website: "http://spam.test"));

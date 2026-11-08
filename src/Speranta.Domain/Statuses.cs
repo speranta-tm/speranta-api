@@ -31,8 +31,8 @@ public enum MessageStatus
 }
 
 /// <summary>
-/// How the person receives the book. The site form always asks for delivery; an
-/// admin switches it to pickup when that is agreed on the phone.
+/// How the person receives the book. Only books that allow it (the children's
+/// books) offer pickup on the form; an admin can still switch any order.
 /// </summary>
 public enum DeliveryMethod
 {
