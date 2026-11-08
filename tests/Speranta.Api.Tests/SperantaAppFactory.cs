@@ -118,7 +118,7 @@ public sealed class SperantaAppFactory : WebApplicationFactory<Program>
         await db.Database.ExecuteSqlRawAsync(
             "truncate book_orders, kids_signups, contact_messages, activity, announcements, admin_invites, outbox_emails, push_subscriptions, "
             + "users, user_roles, user_logins, user_claims, user_tokens restart identity cascade;"
-            + "update books set is_available = true, sort_order = id;"
+            + "delete from books where id > 6; update books set is_available = true, sort_order = id;"
             + "update site_settings set flyer_file_id = null, flyer_downloads = 0, kids_phone = '0764 915 396', smtp_password_protected = null;"
             + "delete from files;"
             + "update mail_status set last_success_at = null, last_failure_at = null, last_error = null, "

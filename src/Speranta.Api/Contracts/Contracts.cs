@@ -51,9 +51,11 @@ public sealed record KidsGroupDto(string Label, TimeOnly Start, TimeOnly End);
 
 public sealed record FlyerDto(string Url, string FileName, DateTimeOffset UploadedAt, long SizeBytes);
 
+/// <summary>A book on the cards and the catalogue. CoverUrl is null for the launch books (the web client ships those covers).</summary>
 public sealed record BookDto(
     string Slug, string Title, bool IsAvailable,
-    bool AsksAgeGroup, bool AsksBibleAtHome, bool AllowsPickup, bool IsForChildren);
+    bool AsksAgeGroup, bool AsksBibleAtHome, bool AllowsPickup, bool IsForChildren,
+    string Blurb, string? CoverUrl);
 
 public sealed record SiteInfo(
     IReadOnlyList<ServiceTimeDto> Services,
@@ -163,7 +165,7 @@ public sealed record ScheduleDto(
 public sealed record AdminFlyer(
     string Url, string FileName, DateTimeOffset UploadedAt, long SizeBytes, int Downloads);
 
-public sealed record AdminBook(int Id, string Slug, string Title, bool IsAvailable, int SortOrder, int NewThisMonth);
+public sealed record AdminBook(int Id, string Slug, string Title, bool IsAvailable, int SortOrder, int NewThisMonth, string? CoverUrl);
 
 public sealed record UpdateBookRequest(bool IsAvailable);
 

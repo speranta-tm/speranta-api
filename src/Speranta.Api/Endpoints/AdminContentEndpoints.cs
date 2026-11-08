@@ -295,7 +295,8 @@ public static class AdminContentEndpoints
         var monthStart = LocalTime.StartOfMonth(clock.GetUtcNow());
         return await db.Books.AsNoTracking().OrderBy(b => b.SortOrder)
             .Select(b => new AdminBook(b.Id, b.Slug, b.Title, b.IsAvailable, b.SortOrder,
-                db.BookOrders.Count(o => o.BookId == b.Id && o.CreatedAt >= monthStart)))
+                db.BookOrders.Count(o => o.BookId == b.Id && o.CreatedAt >= monthStart),
+                b.CoverFileId == null ? null : "/files/" + b.CoverFileId))
             .ToListAsync(ct);
     }
 }

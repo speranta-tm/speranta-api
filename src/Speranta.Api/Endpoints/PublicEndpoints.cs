@@ -104,7 +104,8 @@ public static class PublicEndpoints
         var groups = await db.KidsGroups.AsNoTracking().OrderBy(g => g.SortOrder)
             .Select(g => new KidsGroupDto(g.Label, g.Start, g.End)).ToListAsync(ct);
         var books = await db.Books.AsNoTracking().OrderBy(b => b.SortOrder)
-            .Select(b => new BookDto(b.Slug, b.Title, b.IsAvailable, b.AsksAgeGroup, b.AsksBibleAtHome, b.AllowsPickup, b.IsForChildren))
+            .Select(b => new BookDto(b.Slug, b.Title, b.IsAvailable, b.AsksAgeGroup, b.AsksBibleAtHome, b.AllowsPickup, b.IsForChildren,
+                b.Blurb, b.CoverFileId == null ? null : "/files/" + b.CoverFileId))
             .ToListAsync(ct);
         var settings = await db.Settings.AsNoTracking().Include(s => s.FlyerFile).FirstAsync(ct);
 

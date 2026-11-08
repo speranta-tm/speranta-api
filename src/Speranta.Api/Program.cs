@@ -88,6 +88,7 @@ var auth = app.MapGroup("/auth").RequireRateLimiting(RateLimitSetup.AuthPolicy);
 auth.MapIdentityApi<AppUser>();
 
 app.MapPublicContent();
+app.MapBookPages();
 app.MapForms();
 app.MapInviteAcceptance();
 
@@ -110,6 +111,7 @@ admin.MapAdmins();
 admin.MapAdminMail();
 admin.MapAdminPush();
 admin.MapAdminExports();
+admin.MapAdminBookEditor();
 
 app.MapGet("/", () => Results.Ok(new
 {
