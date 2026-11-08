@@ -1,0 +1,95 @@
+# A published GitHub Release (tag vX.Y.Z on a commit already on main) is what deploys prod. This
+# workflow builds that tag and attaches the two files the Pi's deploy downloads
+# (deploy/pi/speranta-deploy):
+#   speranta-api.tar.gz   the framework-dependent publish output
+#   efbundle              the EF Core migrations bundle, self-contained for linux-arm64
+# Both carry a build attestation (signed by GitHub for this workflow at this tag), which the Pi
+# verifies before deploying, so a file swapped into the release later is refused. When this
+# workflow succeeds, GitHub's workflow_run webhook tells the Pi to deploy. The Pi deploys only runs
+# of THIS file (.github/workflows/release.yml); pre-releases and drafts are skipped.
+name: Release
+
+on:
+  release:
+    # `released`, not `published`: it fires for a new full release AND for a pre-release promoted to
+    # one, and never for pre-releases or drafts.
+    types: [released]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.event.release.tag_name }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: build release assets
+    # The Pi's architecture, like ci.yml's publish job.
+    runs-on: ubuntu-24.04-arm
+    permissions:
+      contents: read
+      id-token: write       # build attestations
+      attestations: write
+    env:
+      TAG: ${{ github.event.release.tag_name }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Check the tag and that its commit is on main
+        run: |
+          [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] \
+            || { echo "::error::release tag '$TAG' is not vX.Y.Z; the Pi would refuse it"; exit 1; }
+          git merge-base --is-ancestor "$GITHUB_SHA" origin/main \
+            || { echo "::error::$TAG ($GITHUB_SHA) is not on main: only reviewed code is released"; exit 1; }
+
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: '10.0.x'
+
+      - run: dotnet tool restore
+
+      - name: Publish the API
+        run: |
+          dotnet publish src/Speranta.Api -c Release -o out/app
+          tar -czf speranta-api.tar.gz -C out/app .
+
+      - name: Build the migrations bundle
+        run: >
+          dotnet dotnet-ef migrations bundle --self-contained -r linux-arm64 --force
+          -p src/Speranta.Infrastructure -s src/Speranta.Api -o efbundle
+
+      - name: Attest the build
+        uses: actions/attest-build-provenance@v4
+        with:
+          subject-path: |
+            speranta-api.tar.gz
+            efbundle
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: release-assets
+          path: |
+            speranta-api.tar.gz
+            efbundle
+          retention-days: 7
+
+  publish:
+    name: attach to the release
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write       # only this job can write, and it runs no project code
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: release-assets
+
+      - name: Attach (never replaces files already on the release)
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.event.release.tag_name }}
+        run: gh release upload "$TAG" speranta-api.tar.gz efbundle -R "$GITHUB_REPOSITORY"

@@ -1,0 +1,66 @@
+[Unit]
+Description=Speranța API (PROD)
+Documentation=https://github.com/speranta-tm/speranta-api/blob/main/deploy/pi/README.md
+After=network-online.target docker.service speranta-netguard.service speranta-egress.service
+Wants=network-online.target docker.service speranta-egress.service
+# Fail closed: without the network guard the app could reach every local service.
+Requires=speranta-netguard.service
+
+[Service]
+Type=simple
+# One user per environment: stage code can't read prod's process or its files. The env file
+# is root-only (0600); systemd reads it before dropping to this user.
+User=speranta-prod
+Group=speranta-prod
+# current -> releases/<version> (root-owned, read-only for the app), switched by the deploy.
+WorkingDirectory=/srv/speranta/apps/api-prod/current
+EnvironmentFile=/srv/speranta/.config/speranta/api-prod.env
+Environment=ASPNETCORE_ENVIRONMENT=Production
+Environment=ASPNETCORE_URLS=http://127.0.0.1:5094
+Environment=DOTNET_EnableDiagnostics=0
+# What the app keeps between releases: uploads (flyers, covers) and the Data Protection keys
+# (sign-in tokens and the Gmail app password saved from the admin). Outside the releases, in
+# the only folder this unit can write; backed up nightly.
+Environment=Storage__Path=/srv/speranta/data/prod/files
+Environment=DataProtection__KeyPath=/srv/speranta/data/prod/dp-keys
+# Outbound HTTPS (Web Push) and SMTP (Gmail) go through the egress proxy; the guard refuses
+# everything else. NO_PROXY keeps Postgres and the proxy itself direct.
+Environment=HTTPS_PROXY=http://127.0.0.1:8898
+Environment=NO_PROXY=127.0.0.1,localhost
+# Re-apply the guard on every start (as root, '+'), so a flushed ruleset can't leave the app unguarded.
+ExecStartPre=+/usr/sbin/nft -f /etc/speranta/netguard.nft
+ExecStart=/opt/dotnet/dotnet /srv/speranta/apps/api-prod/current/Speranta.Api.dll
+Restart=on-failure
+RestartSec=5
+
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectKernelLogs=true
+ProtectControlGroups=true
+ProtectClock=true
+ProtectHostname=true
+ProtectProc=invisible
+RestrictSUIDSGID=true
+RestrictNamespaces=true
+RestrictRealtime=true
+# No AF_UNIX: the app talks TCP only, so world-writable local sockets stay out of reach.
+RestrictAddressFamilies=AF_INET AF_INET6 AF_NETLINK
+LockPersonality=true
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+CapabilityBoundingSet=
+UMask=0077
+# Not MemoryDenyWriteExecute: .NET's JIT needs writable+executable memory.
+# Hide the rest of /srv, /mnt and /nas (world-readable backups and media live there); bring back
+# only this environment's releases (read-only) and its data folder.
+TemporaryFileSystem=/srv:ro /mnt:ro /nas:ro
+BindReadOnlyPaths=/srv/speranta/apps/api-prod
+BindPaths=/srv/speranta/data/prod
+
+[Install]
+WantedBy=multi-user.target

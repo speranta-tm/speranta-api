@@ -1,0 +1,14 @@
+[Unit]
+Description=Speranța network guard (nftables rules for the API's users and its egress proxy)
+Documentation=https://github.com/speranta-tm/speranta-api/blob/main/deploy/pi/README.md
+Before=speranta-api-stage.service speranta-api.service speranta-egress.service
+After=network-pre.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/sbin/nft -f /etc/speranta/netguard.nft
+ExecStop=/usr/sbin/nft delete table inet speranta_guard
+
+[Install]
+WantedBy=multi-user.target
