@@ -1,9 +1,8 @@
 namespace Speranta.Domain.Entities;
 
 /// <summary>
-/// One of the free books. The page text for each book lives in the web client;
-/// the API owns only what an admin changes: the order on the site and whether
-/// it is still in stock.
+/// One of the free books, with everything its page shows. Admins add and edit books
+/// from the panel; the six the site launched with are seeded word for word.
 /// </summary>
 public class Book
 {
@@ -34,6 +33,42 @@ public class Book
 
     /// <summary>Shows the "Pentru copii" label.</summary>
     public bool IsForChildren { get; set; }
+
+    /// <summary>The page's big title, when it differs from <see cref="Title"/> ("Biblia sau Sfânta Scriptură").</summary>
+    public string? Heading { get; set; }
+
+    /// <summary>One sentence on the "Cărți gratuite" catalogue.</summary>
+    public string Blurb { get; set; } = "";
+
+    /// <summary>The first paragraph, set larger.</summary>
+    public string Lead { get; set; } = "";
+
+    public List<string> Paragraphs { get; set; } = [];
+
+    /// <summary>The ticked points under the text. Often empty.</summary>
+    public List<string> Benefits { get; set; } = [];
+
+    /// <summary>The bold closing line. Optional.</summary>
+    public string? Closing { get; set; }
+
+    /// <summary>Above the order form: "Comandă cartea".</summary>
+    public string FormEyebrow { get; set; } = "Comandă cartea";
+
+    /// <summary>The order form's title: "Primește gratuit „…”".</summary>
+    public string FormTitle { get; set; } = "";
+
+    /// <summary>
+    /// Uploaded in the admin. Null for the six launch books, whose covers ship with
+    /// the web client; the client uses its own copy when this is null.
+    /// </summary>
+    public Guid? CoverFileId { get; set; }
+
+    public StoredFile? CoverFile { get; set; }
+
+    /// <summary>The blurred banner behind the title. Falls back to the cover.</summary>
+    public Guid? BannerFileId { get; set; }
+
+    public StoredFile? BannerFile { get; set; }
 }
 
 public class BookOrder
