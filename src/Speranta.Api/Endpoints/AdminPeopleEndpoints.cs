@@ -253,7 +253,7 @@ public static class AdminPeopleEndpoints
 
     private static string PasswordMessage(string code, string fallback) => code switch
     {
-        "PasswordTooShort" => "Parola trebuie să aibă cel puțin 10 caractere.",
+        "PasswordTooShort" => $"Parola trebuie să aibă cel puțin {IdentitySetup.MinPasswordLength} caractere.",
         "PasswordRequiresUniqueChars" => "Parola are prea puține caractere diferite.",
         _ => fallback,
     };

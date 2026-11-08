@@ -46,9 +46,9 @@ public sealed partial class AdminAccessTests(AppFixture fixture) : AppTest(fixtu
         Assert.Equal("voluntar@speranta.test", info.GetProperty("email").GetString());
         Assert.Equal("Marc", info.GetProperty("invitedBy").GetString());
 
-        var tooShort = await anon.PostAsJsonAsync($"/invites/{token}/accept", new { password = "short" });
+        var tooShort = await anon.PostAsJsonAsync($"/invites/{token}/accept", new { password = "abc" });
         Assert.Equal(HttpStatusCode.BadRequest, tooShort.StatusCode);
-        Assert.Contains("cel puțin 10 caractere", await tooShort.Content.ReadAsStringAsync());
+        Assert.Contains("cel puțin 4 caractere", await tooShort.Content.ReadAsStringAsync());
 
         (await anon.PostAsJsonAsync($"/invites/{token}/accept",
             new { password = SperantaAppFactory.Password, displayName = "Voluntar" })).EnsureSuccessStatusCode();
@@ -59,6 +59,23 @@ public sealed partial class AdminAccessTests(AppFixture fixture) : AppTest(fixtu
 
         // Used once, then gone.
         Assert.Equal(HttpStatusCode.NotFound, (await anon.GetAsync($"/invites/{token}")).StatusCode);
+    }
+
+    [Fact]
+    public async Task Four_characters_of_any_kind_are_a_valid_password()
+    {
+        var marc = await App.AdminClientAsync();
+        (await marc.PostAsJsonAsync("/admin/admins/invites", new { email = "short@speranta.test" }))
+            .EnsureSuccessStatusCode();
+        var token = TokenFrom(Assert.Single(App.Outbox()).HtmlBody);
+        var anon = App.CreateClient();
+
+        // Digits only: no lowercase, uppercase or symbol is required.
+        (await anon.PostAsJsonAsync($"/invites/{token}/accept", new { password = "1234" }))
+            .EnsureSuccessStatusCode();
+
+        var login = await anon.PostAsJsonAsync("/auth/login", new { email = "short@speranta.test", password = "1234" });
+        Assert.Equal(HttpStatusCode.OK, login.StatusCode);
     }
 
     [Fact]

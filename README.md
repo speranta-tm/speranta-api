@@ -85,7 +85,7 @@ Bootstrap__AdminEmails__0=you@example.com dotnet run --project src/Speranta.Api
 ```
 
 Sign-in is ASP.NET Identity's bearer tokens under `/auth` (`login`, `refresh`,
-`forgotPassword`, `resetPassword`). Passwords need 10 characters, no symbol rules.
+`forgotPassword`, `resetPassword`). Passwords need 4 characters and nothing else.
 Removing an admin deletes the account, and every admin request checks the account still
 exists, so it takes effect at once rather than when their token expires.
 
