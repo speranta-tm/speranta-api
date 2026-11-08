@@ -28,11 +28,14 @@ builder.Services.AddSperantaCors(builder.Configuration);
 builder.Services.AddOptions<EmailOptions>().Bind(builder.Configuration.GetSection(EmailOptions.SectionName));
 builder.Services.AddOptions<StorageOptions>().Bind(builder.Configuration.GetSection(StorageOptions.SectionName));
 
-// Mail goes through an in-memory outbox drained by a background service, so a
-// visitor never waits on Gmail and a slow SMTP server never fails a form.
-builder.Services.AddSingleton<ChannelMailOutbox>();
-builder.Services.AddSingleton<IMailOutbox>(sp => sp.GetRequiredService<ChannelMailOutbox>());
+// Mail is queued in the database and sent by a background service, so a visitor
+// never waits on Gmail, and a refused or broken mailbox delays notifications
+// instead of losing them: they are retried until they go through.
+builder.Services.AddSingleton<MailKick>();
+builder.Services.AddScoped<IMailOutbox, DbMailOutbox>();
 builder.Services.AddSingleton<IMailTransport, SmtpMailTransport>();
+builder.Services.AddScoped<MailDelivery>();
+builder.Services.AddScoped<MailHealth>();
 builder.Services.AddHostedService<MailSenderService>();
 builder.Services.AddScoped<Notifications>();
 
@@ -96,6 +99,7 @@ admin.MapAccount();
 admin.MapAdminSubmissions();
 admin.MapAdminContent();
 admin.MapAdmins();
+admin.MapAdminMail();
 
 app.MapGet("/", () => Results.Ok(new
 {

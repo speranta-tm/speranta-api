@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Speranta.Api.Contracts;
+using Speranta.Api.Email;
 using Speranta.Api.Setup;
 using Speranta.Domain;
 using Speranta.Domain.Entities;
@@ -61,8 +62,8 @@ public static class AdminSubmissionEndpoints
 
         // ---- Book orders ---------------------------------------------------------
         admin.MapGet("/book-orders", async (
-            SperantaDbContext db, TimeProvider clock, OrderStatus? status, string? q, int? page, int? pageSize,
-            CancellationToken ct) =>
+            SperantaDbContext db, MailHealth mail, TimeProvider clock, OrderStatus? status, string? q, int? page,
+            int? pageSize, CancellationToken ct) =>
         {
             var query = db.BookOrders.AsNoTracking();
             if (!string.IsNullOrWhiteSpace(q))
@@ -87,6 +88,9 @@ public static class AdminSubmissionEndpoints
                 .Select(o => new BookOrderRow(o.Id, o.CreatedAt, o.FullName, o.Phone, o.Book.Slug, o.Book.Title,
                     o.DeliveryMethod, o.Address, o.Status))
                 .ToListAsync(ct);
+
+            var pending = await mail.PendingAsync(SubmissionKind.BookOrder, [.. items.Select(i => i.Id)], ct);
+            items = [.. items.Select(i => i with { EmailPending = pending.Contains(i.Id) })];
 
             return Results.Ok(new SubmissionList<BookOrderRow, OrderStatus>(
                 items, total, number, size, WithZeros(counts), thisMonth));
@@ -150,8 +154,8 @@ public static class AdminSubmissionEndpoints
 
         // ---- Kids' sign-ups ------------------------------------------------------
         admin.MapGet("/kids-signups", async (
-            SperantaDbContext db, TimeProvider clock, SignupStatus? status, string? q, int? page, int? pageSize,
-            CancellationToken ct) =>
+            SperantaDbContext db, MailHealth mail, TimeProvider clock, SignupStatus? status, string? q, int? page,
+            int? pageSize, CancellationToken ct) =>
         {
             var query = db.KidsSignups.AsNoTracking();
             if (!string.IsNullOrWhiteSpace(q))
@@ -179,6 +183,9 @@ public static class AdminSubmissionEndpoints
             var items = rows.Select(s => new KidsSignupRow(s.Id, s.CreatedAt, s.ParentName, s.Phone, s.Email,
                 s.ChildFirstName, s.ChildAge, KidsAge.GroupFor(s.ChildAge), s.ParticipatedBefore, s.Message,
                 s.Status)).ToList();
+
+            var pending = await mail.PendingAsync(SubmissionKind.KidsSignup, [.. items.Select(i => i.Id)], ct);
+            items = [.. items.Select(i => i with { EmailPending = pending.Contains(i.Id) })];
 
             return Results.Ok(new SubmissionList<KidsSignupRow, SignupStatus>(
                 items, total, number, size, WithZeros(counts), thisMonth));
@@ -224,8 +231,8 @@ public static class AdminSubmissionEndpoints
 
         // ---- Contact messages ----------------------------------------------------
         admin.MapGet("/messages", async (
-            SperantaDbContext db, TimeProvider clock, MessageStatus? status, string? q, int? page, int? pageSize,
-            CancellationToken ct) =>
+            SperantaDbContext db, MailHealth mail, TimeProvider clock, MessageStatus? status, string? q, int? page,
+            int? pageSize, CancellationToken ct) =>
         {
             var query = db.ContactMessages.AsNoTracking();
             if (!string.IsNullOrWhiteSpace(q))
@@ -254,6 +261,9 @@ public static class AdminSubmissionEndpoints
             var items = rows.Select(m => new ContactMessageRow(m.Id, m.CreatedAt,
                 Name(m.FirstName, m.LastName, m.Email), m.Email, m.Subject,
                 m.Body.Length > 140 ? m.Body[..140] + "…" : m.Body, m.Status)).ToList();
+
+            var pending = await mail.PendingAsync(SubmissionKind.ContactMessage, [.. items.Select(i => i.Id)], ct);
+            items = [.. items.Select(i => i with { EmailPending = pending.Contains(i.Id) })];
 
             return Results.Ok(new SubmissionList<ContactMessageRow, MessageStatus>(
                 items, total, number, size, WithZeros(counts), thisMonth));
@@ -329,6 +339,9 @@ public static class AdminSubmissionEndpoints
             .OrderBy(a => a.At).ThenBy(a => a.Id)
             .Select(a => new ActivityDto(a.At, a.Text)).ToListAsync(ct);
 
+    private static Task<bool> EmailPending(SperantaDbContext db, SubmissionKind kind, int id, CancellationToken ct) =>
+        db.Outbox.AnyAsync(m => m.Kind == kind && m.SubmissionId == id && m.SentAt == null, ct);
+
     private static async Task<BookOrderDetail?> OrderDetail(SperantaDbContext db, int id, CancellationToken ct)
     {
         var o = await db.BookOrders.AsNoTracking().Include(x => x.Book).FirstOrDefaultAsync(x => x.Id == id, ct);
@@ -336,7 +349,8 @@ public static class AdminSubmissionEndpoints
             ? null
             : new BookOrderDetail(o.Id, o.CreatedAt, o.UpdatedAt, o.FullName, o.Phone, o.Book.Slug, o.Book.Title,
                 o.DeliveryMethod, o.Address, o.AgeGroup, o.HasBibleAtHome, o.Status, o.InternalNote,
-                await History(db, SubmissionKind.BookOrder, id, ct));
+                await History(db, SubmissionKind.BookOrder, id, ct),
+                await EmailPending(db, SubmissionKind.BookOrder, id, ct));
     }
 
     private static async Task<KidsSignupDetail?> SignupDetail(SperantaDbContext db, int id, CancellationToken ct)
@@ -346,7 +360,8 @@ public static class AdminSubmissionEndpoints
             ? null
             : new KidsSignupDetail(s.Id, s.CreatedAt, s.UpdatedAt, s.ParentName, s.Phone, s.Email, s.ChildFirstName,
                 s.ChildAge, KidsAge.GroupFor(s.ChildAge), s.ParticipatedBefore, s.Message, s.Status, s.InternalNote,
-                await History(db, SubmissionKind.KidsSignup, id, ct));
+                await History(db, SubmissionKind.KidsSignup, id, ct),
+                await EmailPending(db, SubmissionKind.KidsSignup, id, ct));
     }
 
     private static async Task<ContactMessageDetail?> MessageDetail(SperantaDbContext db, int id, CancellationToken ct)
@@ -355,6 +370,7 @@ public static class AdminSubmissionEndpoints
         return m is null
             ? null
             : new ContactMessageDetail(m.Id, m.CreatedAt, m.FirstName, m.LastName, m.Email, m.Subject, m.Body,
-                m.Status, await History(db, SubmissionKind.ContactMessage, id, ct));
+                m.Status, await History(db, SubmissionKind.ContactMessage, id, ct),
+                await EmailPending(db, SubmissionKind.ContactMessage, id, ct));
     }
 }

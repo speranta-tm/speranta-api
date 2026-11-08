@@ -37,7 +37,7 @@ public sealed class AdminInvites(
         });
         await db.SaveChangesAsync(ct);
 
-        notify.AdminInvite(address, token, invitedBy?.DisplayName ?? invitedBy?.Email);
+        await notify.AdminInviteAsync(address, token, invitedBy?.DisplayName ?? invitedBy?.Email, ct);
         return $"{email.Value.WebUrl.TrimEnd('/')}/admin/invitatie?token={token}";
     }
 

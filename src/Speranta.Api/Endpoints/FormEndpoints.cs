@@ -96,7 +96,7 @@ public static class FormEndpoints
             await db.SaveChangesAsync(ct);
             await Received(db, SubmissionKind.BookOrder, order.Id, "Comandă primită de pe site", now, ct);
 
-            notify.NewBookOrder(order, book);
+            await notify.NewBookOrderAsync(order, book, ct);
             return Results.Ok(new SubmissionReceipt(order.Id));
         })
             .WithSummary("Order a free book (Timișoara and nearby only).");
@@ -153,7 +153,7 @@ public static class FormEndpoints
             await db.SaveChangesAsync(ct);
             await Received(db, SubmissionKind.KidsSignup, signup.Id, "Înscriere primită de pe site", now, ct);
 
-            notify.NewKidsSignup(signup);
+            await notify.NewKidsSignupAsync(signup, ct);
             return Results.Ok(new SubmissionReceipt(signup.Id));
         })
             .WithSummary("Sign a child up for the Saturday Bible activities.");
@@ -197,7 +197,7 @@ public static class FormEndpoints
             await db.SaveChangesAsync(ct);
             await Received(db, SubmissionKind.ContactMessage, message.Id, "Mesaj primit de pe site", now, ct);
 
-            notify.NewContactMessage(message);
+            await notify.NewContactMessageAsync(message, ct);
             return Results.Ok(new SubmissionReceipt(message.Id));
         })
             .WithSummary("Send the church a message.");
