@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Identity;
 using Speranta.Api.Email;
 using Speranta.Api.Endpoints;
 using Speranta.Api.Setup;
+using Speranta.Api.Push;
 using Speranta.Api.Storage;
 using Speranta.Infrastructure;
 using Speranta.Infrastructure.Identity;
@@ -32,6 +33,7 @@ builder.Services.AddOptions<StorageOptions>().Bind(builder.Configuration.GetSect
 // never waits on Gmail, and a refused or broken mailbox delays notifications
 // instead of losing them: they are retried until they go through.
 builder.Services.AddSingleton<MailKick>();
+builder.Services.AddSingleton<MailCredentials>();
 builder.Services.AddScoped<IMailOutbox, DbMailOutbox>();
 builder.Services.AddSingleton<IMailTransport, SmtpMailTransport>();
 builder.Services.AddScoped<MailDelivery>();
@@ -42,6 +44,12 @@ builder.Services.AddScoped<Notifications>();
 // Transient, not scoped: MapIdentityApi resolves it once from the ROOT provider,
 // which scope validation forbids for a scoped service in Development.
 builder.Services.AddTransient<IEmailSender<AppUser>, IdentityEmailSender>();
+
+// Phone alerts (Web Push), independent of Gmail.
+builder.Services.AddSingleton<VapidKeys>();
+builder.Services.AddSingleton<ChannelPushNotifier>();
+builder.Services.AddSingleton<IPushNotifier>(sp => sp.GetRequiredService<ChannelPushNotifier>());
+builder.Services.AddHostedService<PushSenderService>();
 
 builder.Services.AddScoped<FileStorage>();
 builder.Services.AddScoped<AdminInvites>();
@@ -100,6 +108,8 @@ admin.MapAdminSubmissions();
 admin.MapAdminContent();
 admin.MapAdmins();
 admin.MapAdminMail();
+admin.MapAdminPush();
+admin.MapAdminExports();
 
 app.MapGet("/", () => Results.Ok(new
 {
@@ -115,6 +125,8 @@ app.MapGet("/", () => Results.Ok(new
 app.MapHealthChecks("/health").DisableRateLimiting();
 
 await StartupTasks.RunAsync(app.Services, app.Configuration, app.Logger);
+await MailCredentials.LoadAsync(app.Services, app.Logger);
+await VapidKeys.LoadAsync(app.Services, app.Logger);
 
 app.Run();
 

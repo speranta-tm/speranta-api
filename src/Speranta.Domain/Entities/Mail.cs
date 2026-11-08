@@ -55,4 +55,27 @@ public class MailStatus
     public DateTimeOffset? LastCheckAt { get; set; }
 
     public bool? LastCheckOk { get; set; }
+
+    /// <summary>When admins' phones were last alerted that email is failing (at most daily).</summary>
+    public DateTimeOffset? LastAlertAt { get; set; }
+}
+
+/// <summary>
+/// One admin's browser or phone that agreed to receive alerts (Web Push): new
+/// submissions, and email failing. Independent of Gmail, so it still reaches
+/// someone when email is exactly what broke.
+/// </summary>
+public class PushSubscription
+{
+    public int Id { get; set; }
+
+    public Guid UserId { get; set; }
+
+    public required string Endpoint { get; set; }
+
+    public required string P256dh { get; set; }
+
+    public required string Auth { get; set; }
+
+    public DateTimeOffset CreatedAt { get; set; }
 }

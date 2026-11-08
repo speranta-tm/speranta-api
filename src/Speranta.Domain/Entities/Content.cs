@@ -94,6 +94,18 @@ public class SiteSettings
     public StoredFile? FlyerFile { get; set; }
 
     public int FlyerDownloads { get; set; }
+
+    /// <summary>
+    /// The Gmail app password, when an admin pasted one in ("Cum rezolv?"). Encrypted
+    /// with ASP.NET Data Protection; overrides Email:Password from configuration, so
+    /// the church can restart email without anyone touching the server.
+    /// </summary>
+    public string? SmtpPasswordProtected { get; set; }
+
+    /// <summary>Web Push (VAPID) keys, made on first start. The private half is encrypted.</summary>
+    public string? VapidPublicKey { get; set; }
+
+    public string? VapidPrivateKeyProtected { get; set; }
 }
 
 /// <summary>
@@ -107,6 +119,9 @@ public class AdminInvite
     public required string Email { get; set; }
 
     public required string TokenHash { get; set; }
+
+    /// <summary>The name the inviter typed; becomes the new admin's display name.</summary>
+    public string? DisplayName { get; set; }
 
     public Guid? InvitedByUserId { get; set; }
 

@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Speranta.Api.Contracts;
 using Speranta.Api.Email;
+using Speranta.Api.Push;
 using Speranta.Api.Setup;
 using Speranta.Domain;
 using Speranta.Domain.Entities;
@@ -20,7 +21,7 @@ public static class FormEndpoints
         var forms = app.MapGroup("/forms").RequireRateLimiting(RateLimitSetup.FormPolicy);
 
         forms.MapPost("/book-orders", async (
-            [FromBody] BookOrderRequest req, SperantaDbContext db, Notifications notify,
+            [FromBody] BookOrderRequest req, SperantaDbContext db, Notifications notify, IPushNotifier push,
             TimeProvider clock, CancellationToken ct) =>
         {
             if (IsBot(req.Website))
@@ -97,12 +98,14 @@ public static class FormEndpoints
             await Received(db, SubmissionKind.BookOrder, order.Id, "Comandă primită de pe site", now, ct);
 
             await notify.NewBookOrderAsync(order, book, ct);
+            push.Notify(new PushMessage($"Comandă nouă: {book.Title}", $"{order.FullName} · {order.Phone}",
+                $"/admin/comenzi/{order.Id}"));
             return Results.Ok(new SubmissionReceipt(order.Id));
         })
             .WithSummary("Order a free book (Timișoara and nearby only).");
 
         forms.MapPost("/kids-signups", async (
-            [FromBody] KidsSignupRequest req, SperantaDbContext db, Notifications notify,
+            [FromBody] KidsSignupRequest req, SperantaDbContext db, Notifications notify, IPushNotifier push,
             TimeProvider clock, CancellationToken ct) =>
         {
             if (IsBot(req.Website))
@@ -154,12 +157,14 @@ public static class FormEndpoints
             await Received(db, SubmissionKind.KidsSignup, signup.Id, "Înscriere primită de pe site", now, ct);
 
             await notify.NewKidsSignupAsync(signup, ct);
+            push.Notify(new PushMessage("Înscriere nouă la activitățile pentru copii",
+                $"{signup.ParentName} · {signup.Phone}", $"/admin/inscrieri/{signup.Id}"));
             return Results.Ok(new SubmissionReceipt(signup.Id));
         })
             .WithSummary("Sign a child up for the Saturday Bible activities.");
 
         forms.MapPost("/contact", async (
-            [FromBody] ContactMessageRequest req, SperantaDbContext db, Notifications notify,
+            [FromBody] ContactMessageRequest req, SperantaDbContext db, Notifications notify, IPushNotifier push,
             TimeProvider clock, CancellationToken ct) =>
         {
             if (IsBot(req.Website))
@@ -198,6 +203,8 @@ public static class FormEndpoints
             await Received(db, SubmissionKind.ContactMessage, message.Id, "Mesaj primit de pe site", now, ct);
 
             await notify.NewContactMessageAsync(message, ct);
+            push.Notify(new PushMessage("Mesaj nou de pe site", message.Subject ?? message.Email,
+                $"/admin/mesaje/{message.Id}"));
             return Results.Ok(new SubmissionReceipt(message.Id));
         })
             .WithSummary("Send the church a message.");

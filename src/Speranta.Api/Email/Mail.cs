@@ -5,6 +5,7 @@ using Microsoft.Extensions.Options;
 using MimeKit;
 using Speranta.Domain;
 using Speranta.Domain.Entities;
+using Speranta.Api.Push;
 using Speranta.Infrastructure;
 
 namespace Speranta.Api.Email;
@@ -13,12 +14,12 @@ public sealed class EmailOptions
 {
     public const string SectionName = "Email";
 
-    /// <summary>SMTP host, e.g. smtp.gmail.com. Empty disables sending (mail waits in the outbox).</summary>
-    public string Host { get; set; } = "";
+    /// <summary>SMTP host. Gmail by default.</summary>
+    public string Host { get; set; } = "smtp.gmail.com";
 
     public int Port { get; set; } = 587;
 
-    /// <summary>SMTP username; for Gmail, the full address.</summary>
+    /// <summary>SMTP username; for Gmail, the full address. Empty means <see cref="NotifyTo"/>.</summary>
     public string User { get; set; } = "";
 
     /// <summary>
@@ -46,9 +47,6 @@ public sealed class EmailOptions
     /// </summary>
     public double CheckIntervalHours { get; set; } = 6;
 
-    public bool IsConfigured => !string.IsNullOrWhiteSpace(Host)
-        && !string.IsNullOrWhiteSpace(User)
-        && !string.IsNullOrWhiteSpace(Password);
 }
 
 /// <summary>An email ready to go: what the transport needs.</summary>
@@ -109,18 +107,18 @@ public interface IMailTransport
     Task CheckAsync(CancellationToken ct);
 }
 
-public sealed class SmtpMailTransport(IOptions<EmailOptions> options) : IMailTransport
+public sealed class SmtpMailTransport(IOptions<EmailOptions> options, MailCredentials credentials) : IMailTransport
 {
     private readonly EmailOptions _options = options.Value;
 
-    public bool IsConfigured => _options.IsConfigured;
+    public bool IsConfigured => credentials.IsConfigured;
 
     public async Task SendAsync(OutgoingMail mail, CancellationToken ct)
     {
         var message = new MimeMessage();
         message.From.Add(new MailboxAddress(
             _options.FromName,
-            string.IsNullOrWhiteSpace(_options.From) ? _options.User : _options.From));
+            string.IsNullOrWhiteSpace(_options.From) ? credentials.User : _options.From));
         message.To.Add(MailboxAddress.Parse(mail.To));
         message.Subject = mail.Subject;
         message.Body = new BodyBuilder { HtmlBody = mail.HtmlBody }.ToMessageBody();
@@ -141,9 +139,9 @@ public sealed class SmtpMailTransport(IOptions<EmailOptions> options) : IMailTra
         var client = new SmtpClient { Timeout = 30_000 };
         try
         {
-            var socket = _options.Port == 465 ? SecureSocketOptions.SslOnConnect : SecureSocketOptions.StartTls;
-            await client.ConnectAsync(_options.Host, _options.Port, socket, ct);
-            await client.AuthenticateAsync(_options.User, _options.Password, ct);
+            var socket = credentials.Port == 465 ? SecureSocketOptions.SslOnConnect : SecureSocketOptions.StartTls;
+            await client.ConnectAsync(credentials.Host, credentials.Port, socket, ct);
+            await client.AuthenticateAsync(credentials.User, credentials.Password, ct);
             return client;
         }
         catch
@@ -159,8 +157,27 @@ public sealed class SmtpMailTransport(IOptions<EmailOptions> options) : IMailTra
 /// tests (and the admin's "send a test email") can run one pass on demand.
 /// </summary>
 public sealed class MailDelivery(
-    SperantaDbContext db, IMailTransport transport, TimeProvider clock, ILogger<MailDelivery> logger)
+    SperantaDbContext db, IMailTransport transport, IPushNotifier push, TimeProvider clock, ILogger<MailDelivery> logger)
 {
+    /// <summary>
+    /// Tells admins' phones that email stopped: once when it breaks, then at most daily
+    /// while it stays broken. Push does not go through Gmail, so it still arrives.
+    /// </summary>
+    private void AlertFailing(MailStatus status)
+    {
+        var now = clock.GetUtcNow();
+        if (status.LastAlertAt is { } last && now - last < TimeSpan.FromHours(24))
+        {
+            return;
+        }
+
+        status.LastAlertAt = now;
+        push.Notify(new PushMessage(
+            "Emailurile de pe site nu mai pleacă",
+            "Comenzile și înscrierile sunt în panou. Intră în admin și apasă „Cum rezolv?”.",
+            "/admin"));
+    }
+
     /// <summary>Retry spacing: quick at first, then hourly, forever, until it goes through.</summary>
     internal static TimeSpan Backoff(int attempts) => attempts switch
     {
@@ -200,6 +217,7 @@ public sealed class MailDelivery(
                 mail.SentAt = clock.GetUtcNow();
                 mail.LastError = null;
                 status.LastSuccessAt = mail.SentAt;
+                status.LastAlertAt = null; // working again: the next breakage alerts at once
                 sent++;
 
                 if (mail is { Kind: { } kind, SubmissionId: { } id })
@@ -221,6 +239,7 @@ public sealed class MailDelivery(
                 mail.NextAttemptAt = clock.GetUtcNow() + Backoff(mail.Attempts);
                 status.LastFailureAt = clock.GetUtcNow();
                 status.LastError = mail.LastError;
+                AlertFailing(status);
                 logger.LogError(ex, "Sending '{Subject}' to {To} failed (attempt {Attempt}).",
                     mail.Subject, mail.To, mail.Attempts);
 
@@ -256,12 +275,14 @@ public sealed class MailDelivery(
             {
                 await transport.CheckAsync(ct);
                 status.LastCheckOk = true;
+                status.LastAlertAt = null;
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
                 status.LastCheckOk = false;
                 status.LastFailureAt = status.LastCheckAt;
                 status.LastError = Truncate(ex.Message);
+                AlertFailing(status);
                 logger.LogError(ex, "Mailbox sign-in check failed.");
             }
         }

@@ -36,6 +36,8 @@ public class SperantaDbContext(DbContextOptions<SperantaDbContext> options)
 
     public DbSet<MailStatus> MailStatus => Set<MailStatus>();
 
+    public DbSet<PushSubscription> PushSubscriptions => Set<PushSubscription>();
+
     protected override void OnModelCreating(ModelBuilder builder)
     {
         base.OnModelCreating(builder);
@@ -154,6 +156,9 @@ public class SperantaDbContext(DbContextOptions<SperantaDbContext> options)
                 "ck_site_settings_singleton", $"id = {SiteSettings.SingletonId}"));
             e.Property(x => x.Id).ValueGeneratedNever();
             e.Property(x => x.KidsPhone).HasMaxLength(Limits.Phone);
+            e.Property(x => x.SmtpPasswordProtected).HasMaxLength(1000);
+            e.Property(x => x.VapidPublicKey).HasMaxLength(200);
+            e.Property(x => x.VapidPrivateKeyProtected).HasMaxLength(1000);
             e.HasOne(x => x.FlyerFile).WithMany().HasForeignKey(x => x.FlyerFileId)
                 .OnDelete(DeleteBehavior.SetNull);
             e.HasData(new SiteSettings { Id = SiteSettings.SingletonId, KidsPhone = "0764 915 396" });
@@ -181,10 +186,21 @@ public class SperantaDbContext(DbContextOptions<SperantaDbContext> options)
             e.HasData(new MailStatus { Id = Speranta.Domain.Entities.MailStatus.SingletonId });
         });
 
+        builder.Entity<PushSubscription>(e =>
+        {
+            e.ToTable("push_subscriptions");
+            e.Property(x => x.Endpoint).HasMaxLength(1000);
+            e.Property(x => x.P256dh).HasMaxLength(200);
+            e.Property(x => x.Auth).HasMaxLength(100);
+            e.HasIndex(x => x.Endpoint).IsUnique();
+            e.HasIndex(x => x.UserId);
+        });
+
         builder.Entity<AdminInvite>(e =>
         {
             e.Property(x => x.Email).HasMaxLength(Limits.Email);
             e.Property(x => x.TokenHash).HasMaxLength(64);
+            e.Property(x => x.DisplayName).HasMaxLength(100);
             e.HasIndex(x => x.TokenHash).IsUnique();
             e.HasIndex(x => x.Email);
         });
