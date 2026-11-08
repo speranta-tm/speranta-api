@@ -13,6 +13,9 @@ public static class IdentitySetup
 {
     public const string AdminPolicy = "admin";
 
+    /// <summary>The only password rule: at least this many characters, of any kind.</summary>
+    public const int MinPasswordLength = 4;
+
     /// <summary>
     /// Persists Data Protection keys when a path is configured. The bearer tokens are
     /// protected with these keys; kept only in memory, every restart would sign every
@@ -43,11 +46,13 @@ public static class IdentitySetup
                 options.User.RequireUniqueEmail = true;
                 options.SignIn.RequireConfirmedEmail = false;
 
-                // Length carries far more real strength than symbol classes, which
-                // mostly produce "Pa$$w0rd".
-                options.Password.RequiredLength = 10;
+                // A minimum length and nothing else: no character classes. Identity requires a
+                // lowercase letter by default, so that one is switched off explicitly too.
+                options.Password.RequiredLength = MinPasswordLength;
+                options.Password.RequiredUniqueChars = 1;
                 options.Password.RequireNonAlphanumeric = false;
                 options.Password.RequireUppercase = false;
+                options.Password.RequireLowercase = false;
                 options.Password.RequireDigit = false;
 
                 options.Lockout.MaxFailedAccessAttempts = 10;
