@@ -1,0 +1,44 @@
+[Unit]
+Description=Speranța egress proxy (tinyproxy: the API's only way out)
+Documentation=https://github.com/speranta-tm/speranta-api/blob/main/deploy/pi/README.md
+After=network-online.target speranta-netguard.service
+Wants=network-online.target
+# The proxy never runs unguarded.
+Requires=speranta-netguard.service
+
+[Service]
+Type=simple
+User=speranta-egress
+Group=speranta-egress
+ExecStartPre=+/usr/sbin/nft -f /etc/speranta/netguard.nft
+ExecStart=/usr/bin/tinyproxy -d -c /etc/speranta/egress.conf
+Restart=on-failure
+RestartSec=5
+
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectKernelLogs=true
+ProtectControlGroups=true
+ProtectClock=true
+ProtectHostname=true
+ProtectProc=invisible
+RestrictSUIDSGID=true
+RestrictNamespaces=true
+RestrictRealtime=true
+# AF_UNIX for syslog (/dev/log) only.
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+LockPersonality=true
+MemoryDenyWriteExecute=true
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+CapabilityBoundingSet=
+UMask=0077
+TemporaryFileSystem=/srv:ro /mnt:ro /nas:ro
+
+[Install]
+WantedBy=multi-user.target

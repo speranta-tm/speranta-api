@@ -7,7 +7,8 @@ of content the church changes, and serves the admin.
 - **Stack:** .NET 10 (ASP.NET Core minimal APIs) · PostgreSQL 18 · EF Core 10 (Npgsql)
 - **Client:** [`speranta-web`](https://github.com/maze-33/speranta-web) (React + Vite)
 - **Design:** [Figma](https://www.figma.com/design/NolJGaQ4AKE8Eqwc3ZXTaS)
-- **Hosting:** not decided yet. Runs locally.
+- **Hosting:** a Raspberry Pi, stage and prod. Merge to `main` deploys stage; a GitHub Release
+  `vX.Y.Z` deploys prod. How it works and how to operate it: [deploy/pi/README.md](deploy/pi/README.md).
 
 ## What it does
 
@@ -127,7 +128,8 @@ dotnet dotnet-ef migrations add <Name> -p src/Speranta.Infrastructure -s src/Spe
 ```
 
 Read what EF generated before committing; never edit a migration that has run anywhere.
-Migrations are not applied at startup. CI fails if the model has changes with no migration.
+Migrations are not applied at startup: each deploy runs them first, from the migrations bundle CI
+builds. CI fails if the model has changes with no migration.
 
 ## Tests
 

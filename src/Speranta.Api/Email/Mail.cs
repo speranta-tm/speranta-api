@@ -1,3 +1,5 @@
+using System.Net;
+using MailKit.Net.Proxy;
 using MailKit.Net.Smtp;
 using MailKit.Security;
 using Microsoft.EntityFrameworkCore;
@@ -136,7 +138,7 @@ public sealed class SmtpMailTransport(IOptions<EmailOptions> options, MailCreden
 
     private async Task<SmtpClient> ConnectAsync(CancellationToken ct)
     {
-        var client = new SmtpClient { Timeout = 30_000 };
+        var client = new SmtpClient { Timeout = 30_000, ProxyClient = SmtpProxy.For(credentials.Host, credentials.Port) };
         try
         {
             var socket = credentials.Port == 465 ? SecureSocketOptions.SslOnConnect : SecureSocketOptions.StartTls;
@@ -149,6 +151,33 @@ public sealed class SmtpMailTransport(IOptions<EmailOptions> options, MailCreden
             client.Dispose();
             throw;
         }
+    }
+}
+
+/// <summary>
+/// The HTTP proxy SMTP goes through, from the same <c>HTTPS_PROXY</c> / <c>NO_PROXY</c>
+/// environment that <see cref="HttpClient"/> (and so Web Push) already follows.
+///
+/// On the Pi the API may not open connections to the internet itself: everything goes
+/// through an egress proxy that allows only the hosts it needs (deploy/pi/README.md).
+/// HttpClient picks the proxy up on its own; MailKit doesn't, so it is handed over here as
+/// an HTTP CONNECT tunnel. With no proxy configured (development, tests) SMTP connects
+/// directly, as before.
+/// </summary>
+public static class SmtpProxy
+{
+    public static IProxyClient? For(string host, int port, IWebProxy? proxies = null)
+    {
+        proxies ??= HttpClient.DefaultProxy;
+        var target = new Uri($"https://{host}:{port}/");
+
+        if (proxies.IsBypassed(target))
+        {
+            return null;
+        }
+
+        var proxy = proxies.GetProxy(target);
+        return proxy is null || proxy == target ? null : new HttpProxyClient(proxy.Host, proxy.Port);
     }
 }
 

@@ -62,3 +62,68 @@ jobs:
           dotnet tool restore
           dotnet dotnet-ef migrations has-pending-model-changes \
             -p src/Speranta.Infrastructure -s src/Speranta.Api --no-build --configuration Release
+
+  # What the Pi deploys (deploy/pi/README.md). A green run of this file for a push to main is
+  # deployed to stage by the Pi, which downloads these two artifacts; nothing is built on the Pi.
+  # Built on GitHub's arm64 runner, the Pi's architecture, so the migrations bundle can be run
+  # here exactly as the Pi will run it. The names `speranta-api` / `speranta-efbundle` and the
+  # file `efbundle` are what deploy/pi/speranta-deploy downloads.
+  publish:
+    name: publish (linux-arm64)
+    runs-on: ubuntu-24.04-arm
+
+    services:
+      postgres:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_DB: speranta_bundle
+          POSTGRES_USER: speranta
+          POSTGRES_PASSWORD: speranta_dev
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U speranta -d speranta_bundle"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: '10.0.x'
+
+      # Framework-dependent: the Pi runs it on its own .NET 10 runtime (/opt/dotnet).
+      - run: dotnet publish src/Speranta.Api -c Release -o out/app
+
+      # One self-contained executable: the Pi needs neither the SDK nor dotnet-ef. It reads
+      # ConnectionStrings__Postgres from its environment (the Pi's env file), so no password
+      # is ever in a command line.
+      - name: Migrations bundle
+        run: |
+          dotnet tool restore
+          dotnet dotnet-ef migrations bundle --self-contained -r linux-arm64 --force \
+            -p src/Speranta.Infrastructure -s src/Speranta.Api -o out/efbundle/efbundle
+
+      # The bundle the Pi will run, applied to an empty database the way the Pi applies it.
+      - name: The bundle migrates an empty database
+        working-directory: out/efbundle
+        env:
+          ASPNETCORE_ENVIRONMENT: Production
+          ConnectionStrings__Postgres: Host=localhost;Port=5432;Database=speranta_bundle;Username=speranta;Password=speranta_dev
+        run: ./efbundle
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: speranta-api
+          path: out/app
+          retention-days: 14
+          if-no-files-found: error
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: speranta-efbundle
+          path: out/efbundle/efbundle
+          retention-days: 14
+          if-no-files-found: error

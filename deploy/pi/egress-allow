@@ -1,0 +1,9 @@
+# Hosts the Speranța API may reach through its egress proxy: one anchored ERE per line, in CONNECT
+# form "^host:port$" (FilterURLs On: plain-HTTP requests start with http:// and never match).
+# Gmail SMTP (Email:Host/Port; a different mail provider needs its line here).
+^smtp\.gmail\.com:587$
+# Web Push: the push service each browser's subscription points at.
+^fcm\.googleapis\.com:443$
+^updates\.push\.services\.mozilla\.com:443$
+^web\.push\.apple\.com:443$
+^[a-z0-9-]+\.notify\.windows\.com:443$

@@ -1,0 +1,24 @@
+# Speranța Postgres on the Pi: one container, a database + role per environment
+# (speranta_stage, speranta_prod). Installed as /srv/speranta/postgres/compose.yml.
+# Admin credentials: ~thorsp/.config/speranta/postgres.env (POSTGRES_USER / POSTGRES_PASSWORD).
+# Bound to 127.0.0.1 only: Docker-published ports bypass UFW. Dumped nightly by pibackup.
+name: speranta
+services:
+  postgres:
+    image: postgres:18-alpine
+    container_name: speranta-postgres
+    env_file: /home/thorsp/.config/speranta/postgres.env
+    ports:
+      - "127.0.0.1:5436:5432"
+    volumes:
+      # The parent of the data dir: Postgres 18+ images keep data in a per-version subdirectory.
+      - speranta-pgdata:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+    mem_limit: 384m
+volumes:
+  speranta-pgdata:

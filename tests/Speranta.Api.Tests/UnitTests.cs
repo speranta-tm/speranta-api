@@ -1,3 +1,4 @@
+using Speranta.Api.Email;
 using Speranta.Api.Setup;
 using Speranta.Domain;
 
@@ -28,6 +29,24 @@ public sealed class UnitTests
         // 31 Oct 23:30 UTC is already 1 Nov 01:30 in Timișoara (UTC+2 in winter).
         var start = LocalTime.StartOfMonth(DateTimeOffset.Parse("2026-10-31T23:30:00Z"));
         Assert.Equal(DateTimeOffset.Parse("2026-10-31T22:00:00Z"), start);
+    }
+
+    [Fact]
+    public void Smtp_goes_through_the_configured_proxy()
+    {
+        var proxy = Assert.IsType<MailKit.Net.Proxy.HttpProxyClient>(
+            SmtpProxy.For("smtp.gmail.com", 587, new System.Net.WebProxy("http://127.0.0.1:8898")));
+
+        Assert.Equal("127.0.0.1", proxy.ProxyHost);
+        Assert.Equal(8898, proxy.ProxyPort);
+    }
+
+    [Fact]
+    public void Smtp_connects_directly_without_a_proxy_or_when_bypassed()
+    {
+        Assert.Null(SmtpProxy.For("smtp.gmail.com", 587, new System.Net.WebProxy()));
+        Assert.Null(SmtpProxy.For("localhost", 25,
+            new System.Net.WebProxy("http://127.0.0.1:8898") { BypassProxyOnLocal = true }));
     }
 
     [Fact]
