@@ -265,7 +265,7 @@ fi
 # ---- install into a staging dir outside releases/, root-owned and read-only to the app -------
 phase=install
 incoming=$base/.incoming/$version
-sudo install -d -m 755 "$base/.incoming"
+sudo install -d -m 755 "$base/.incoming" "$base/releases"
 sudo rm -rf -- "${incoming:?}"
 sudo install -d -m 755 "$incoming"
 sudo cp -a "$work/app/." "$incoming/"

@@ -113,7 +113,7 @@ Changing `Email:Host` to another mail provider needs its line too. Don't widen t
 ## One-time setup (done; for a new machine)
 
 - Users `speranta-stage`, `speranta-prod` and `speranta-egress` (system, no shell, no home).
-- `/srv/speranta/apps/api-{stage,prod}/` (root), `data/{stage,prod}/{files,dp-keys}` (owned by each
+- `/srv/speranta/apps/api-{stage,prod}/` (root; the deploy creates `releases/` and `.incoming/` in it), `data/{stage,prod}/{files,dp-keys}` (owned by each
   user, 0700), `.config/speranta/` (root, 0700).
 - Postgres: [`postgres.compose.yml`](postgres.compose.yml) at `/srv/speranta/postgres/compose.yml`,
   bound to `127.0.0.1:5436`, with a role and database per environment.
