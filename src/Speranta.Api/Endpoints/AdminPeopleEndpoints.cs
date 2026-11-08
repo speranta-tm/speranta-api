@@ -21,7 +21,7 @@ public sealed class AdminInvites(
     public static readonly TimeSpan Lifetime = TimeSpan.FromDays(7);
 
     /// <summary>Stores the invitation and queues its email. Returns the link (for the bootstrap log).</summary>
-    public async Task<string> CreateAsync(string address, AppUser? invitedBy, CancellationToken ct)
+    public async Task<string> CreateAsync(string address, string? displayName, AppUser? invitedBy, CancellationToken ct)
     {
         var token = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32))
             .TrimEnd('=').Replace('+', '-').Replace('/', '_');
@@ -31,6 +31,7 @@ public sealed class AdminInvites(
         {
             Email = address,
             TokenHash = Hash(token),
+            DisplayName = displayName,
             InvitedByUserId = invitedBy?.Id,
             CreatedAt = now,
             ExpiresAt = now + Lifetime,
@@ -97,6 +98,7 @@ public static class AdminPeopleEndpoints
         {
             var v = new Validation();
             var address = v.Email("email", req.Email, required: true);
+            var displayName = v.Text("displayName", req.DisplayName, 100, false, "");
             if (!v.IsValid)
             {
                 return v.Problem();
@@ -117,7 +119,7 @@ public static class AdminPeopleEndpoints
                 .Where(i => i.Email.ToUpper() == upper && i.AcceptedAt == null && i.ExpiresAt > now)
                 .ExecuteUpdateAsync(i => i.SetProperty(x => x.ExpiresAt, now), ct);
 
-            await invites.CreateAsync(address, await users.GetUserAsync(principal), ct);
+            await invites.CreateAsync(address, displayName, await users.GetUserAsync(principal), ct);
             return Results.Ok(await List(db, users, principal.Id(), clock, ct));
         })
             .RequireRateLimiting(RateLimitSetup.AuthPolicy)
@@ -179,7 +181,7 @@ public static class AdminPeopleEndpoints
                 ? await db.Users.Where(u => u.Id == uid).Select(u => u.DisplayName ?? u.Email).FirstOrDefaultAsync(ct)
                 : null;
 
-            return Results.Ok(new InviteInfo(invite.Email, by));
+            return Results.Ok(new InviteInfo(invite.Email, invite.DisplayName, by));
         })
             .WithSummary("Who the invitation is for. 404 when it is unknown, used or expired.");
 
@@ -194,7 +196,7 @@ public static class AdminPeopleEndpoints
             }
 
             var v = new Validation();
-            var name = v.Text("displayName", req.DisplayName, 100, false, "");
+            var name = v.Text("displayName", req.DisplayName, 100, false, "") ?? invite.DisplayName;
             if (string.IsNullOrEmpty(req.Password))
             {
                 v.Add("password", "Alegeți o parolă.");
@@ -267,7 +269,7 @@ public static class AdminPeopleEndpoints
         var invites = await db.AdminInvites.AsNoTracking()
             .Where(i => i.AcceptedAt == null && i.ExpiresAt > now)
             .OrderBy(i => i.CreatedAt)
-            .Select(i => new PendingInviteDto(i.Id, i.Email, i.CreatedAt, i.ExpiresAt))
+            .Select(i => new PendingInviteDto(i.Id, i.Email, i.DisplayName, i.CreatedAt, i.ExpiresAt))
             .ToListAsync(ct);
 
         return new AdminsDto(admins, invites);

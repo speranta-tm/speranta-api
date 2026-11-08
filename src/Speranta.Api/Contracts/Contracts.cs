@@ -177,12 +177,12 @@ public sealed record UpdateAccountRequest(string? DisplayName);
 
 public sealed record AdminUserDto(Guid Id, string Email, string? DisplayName, bool IsYou);
 
-public sealed record PendingInviteDto(int Id, string Email, DateTimeOffset CreatedAt, DateTimeOffset ExpiresAt);
+public sealed record PendingInviteDto(int Id, string Email, string? DisplayName, DateTimeOffset CreatedAt, DateTimeOffset ExpiresAt);
 
 public sealed record AdminsDto(IReadOnlyList<AdminUserDto> Admins, IReadOnlyList<PendingInviteDto> Invites);
 
-public sealed record CreateInviteRequest(string? Email);
+public sealed record CreateInviteRequest(string? Email, string? DisplayName);
 
-public sealed record InviteInfo(string Email, string? InvitedBy);
+public sealed record InviteInfo(string Email, string? DisplayName, string? InvitedBy);
 
 public sealed record AcceptInviteRequest(string? Password, string? DisplayName);

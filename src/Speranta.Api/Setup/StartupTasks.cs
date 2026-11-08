@@ -66,7 +66,7 @@ public static class StartupTasks
                 continue;
             }
 
-            var link = await invites.CreateAsync(email, invitedBy: null, CancellationToken.None);
+            var link = await invites.CreateAsync(email, displayName: null, invitedBy: null, CancellationToken.None);
             logger.LogWarning(
                 "Bootstrap invitation for {Email}: {Link} (valid 7 days, also emailed).", email, link);
         }

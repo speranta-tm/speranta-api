@@ -7,6 +7,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Npgsql;
 using Speranta.Api.Email;
+using Speranta.Api.Push;
 using Speranta.Infrastructure;
 using Speranta.Infrastructure.Identity;
 
@@ -24,6 +25,9 @@ public sealed class SperantaAppFactory : WebApplicationFactory<Program>
 
     /// <summary>Stands in for Gmail: records what it was asked to send, and can be told to refuse.</summary>
     public FakeMailTransport Mail { get; } = new();
+
+    /// <summary>Phone alerts the app asked to send.</summary>
+    public RecordingPush Push { get; } = new();
 
     public TestClock Clock { get; } = new(DateTimeOffset.Parse("2026-11-08T09:00:00Z"));
 
@@ -67,6 +71,10 @@ public sealed class SperantaAppFactory : WebApplicationFactory<Program>
             var sender = services.Single(d => d.ImplementationType == typeof(MailSenderService));
             services.Remove(sender);
 
+            services.RemoveAll<IPushNotifier>();
+            services.AddSingleton<IPushNotifier>(Push);
+            services.Remove(services.Single(d => d.ImplementationType == typeof(PushSenderService)));
+
             services.RemoveAll<TimeProvider>();
             services.AddSingleton<TimeProvider>(Clock);
         });
@@ -100,19 +108,21 @@ public sealed class SperantaAppFactory : WebApplicationFactory<Program>
     public async Task ResetAsync()
     {
         Mail.Reset();
+        Push.Sent.Clear();
+        Services.GetRequiredService<MailCredentials>().UseSaved(null);
         Clock.Set(DateTimeOffset.Parse("2026-11-08T09:00:00Z"));
 
         using var scope = Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<SperantaDbContext>();
 
         await db.Database.ExecuteSqlRawAsync(
-            "truncate book_orders, kids_signups, contact_messages, activity, announcements, admin_invites, outbox_emails, "
+            "truncate book_orders, kids_signups, contact_messages, activity, announcements, admin_invites, outbox_emails, push_subscriptions, "
             + "users, user_roles, user_logins, user_claims, user_tokens restart identity cascade;"
             + "update books set is_available = true, sort_order = id;"
-            + "update site_settings set flyer_file_id = null, flyer_downloads = 0, kids_phone = '0764 915 396';"
+            + "update site_settings set flyer_file_id = null, flyer_downloads = 0, kids_phone = '0764 915 396', smtp_password_protected = null;"
             + "delete from files;"
             + "update mail_status set last_success_at = null, last_failure_at = null, last_error = null, "
-            + "last_check_at = null, last_check_ok = null;");
+            + "last_check_at = null, last_check_ok = null, last_alert_at = null;");
     }
 
     /// <summary>An admin account, signed in, as a bearer client.</summary>
@@ -177,6 +187,19 @@ public sealed class SperantaAppFactory : WebApplicationFactory<Program>
     }
 
     private sealed record TokenPayload(string AccessToken);
+}
+
+public sealed class RecordingPush : IPushNotifier
+{
+    public List<PushMessage> Sent { get; } = [];
+
+    public void Notify(PushMessage message)
+    {
+        lock (Sent)
+        {
+            Sent.Add(message);
+        }
+    }
 }
 
 public sealed class FakeMailTransport : IMailTransport

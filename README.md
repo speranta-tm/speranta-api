@@ -20,7 +20,9 @@ of content the church changes, and serves the admin.
 | Schedule, kids' groups, phone | `GET /site` | `PUT /admin/schedule` |
 | Monthly flyer | `GET /flyer` (redirects to the current PDF, counts downloads) | `POST /admin/flyer` |
 | Books on/off and order | `GET /site` | `PATCH /admin/books/{id}`, `PUT /admin/books/order` |
-| Admins | | invite by email, remove |
+| Admins | | invite by email (with a name), remove |
+| Exports | | `GET /admin/book-orders.csv`, `GET /admin/kids-signups.csv` (Excel-ready) |
+| Phone alerts | | `/admin/push/*` |
 
 Page texts (the book descriptions, the kids' page, contact details) live in the web
 client. The API holds only what an admin changes.
@@ -53,6 +55,14 @@ form daily. Here:
   Each submission carries `emailPending`, and its history gets "Email trimis la …" only once
   the email really went out.
 - Nothing is lost either way: every submission is in the admin before any email is tried.
+- **The church can fix it themselves.** The banner's "Cum rezolv?" walks through making a new
+  app password and pasting it in the admin (`PUT /admin/mail-settings`). It is stored encrypted
+  (ASP.NET Data Protection), overrides `Email:Password`, is checked at once, and everything
+  waiting goes out. No server access needed.
+- **Phone alerts (Web Push)** for admins who turn them on: every new order, sign-up and message,
+  and "emailurile nu mai pleacă" when email breaks (once, then at most daily). Push does not go
+  through Gmail, so it still arrives when email is what broke. The VAPID keys are made on first
+  start and kept in the database.
 
 **Spam:** each form carries a hidden `website` field (a honeypot, as on the old site): a
 bot that fills it gets the same 200 and nothing is saved. Forms are also rate-limited per
@@ -98,7 +108,7 @@ the service times, the two kids' groups and the kids' phone number.
 | Key | Meaning |
 |---|---|
 | `ConnectionStrings:Postgres` | required |
-| `Email:Host`, `Port`, `User`, `Password` | SMTP; for Gmail use an app password. Empty = log instead of send |
+| `Email:Host`, `Port`, `User`, `Password` | SMTP. Defaults to Gmail with `NotifyTo` as the user; the password is a Gmail app password, here or saved from the admin |
 | `Email:NotifyTo` | where new submissions are announced |
 | `Email:WebUrl` | the web client's base URL, for links in emails |
 | `Storage:Path` | folder for uploads (flyers, covers); relative to the content root |

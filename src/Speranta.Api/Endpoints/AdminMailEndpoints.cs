@@ -1,3 +1,5 @@
+using Microsoft.AspNetCore.DataProtection;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using Speranta.Api.Email;
@@ -51,6 +53,42 @@ public static class AdminMailEndpoints
         })
             .WithSummary("Send a test email to the notification address now.");
 
+        // "Cum rezolv?": the admin pastes a new Gmail app password. It is stored
+        // encrypted, used at once, checked, and everything waiting goes out.
+        admin.MapPut("/mail-settings", async (
+            [FromBody] MailSettingsRequest req, SperantaDbContext db, MailCredentials credentials,
+            IDataProtectionProvider protection, MailDelivery delivery, MailHealth health, TimeProvider clock,
+            CancellationToken ct) =>
+        {
+            // Google shows it as four groups of four letters; the spaces are not part of it.
+            var password = new string((req.AppPassword ?? "").Where(c => !char.IsWhiteSpace(c)).ToArray());
+            if (password.Length is < 8 or > 100)
+            {
+                return Results.ValidationProblem(new Dictionary<string, string[]>
+                {
+                    ["appPassword"] = ["Lipește parola de aplicație: 16 litere, așa cum o arată Google."],
+                });
+            }
+
+            var settings = await db.Settings.FirstAsync(ct);
+            settings.SmtpPasswordProtected = protection.CreateProtector(MailCredentials.ProtectorPurpose).Protect(password);
+            await db.SaveChangesAsync(ct);
+            credentials.UseSaved(password);
+
+            if (await delivery.CheckAsync(ct))
+            {
+                var now = clock.GetUtcNow();
+                await db.Outbox.Where(m => m.SentAt == null)
+                    .ExecuteUpdateAsync(m => m.SetProperty(x => x.NextAttemptAt, now), ct);
+                await delivery.ProcessDueAsync(ct);
+            }
+
+            return Results.Ok(await health.GetAsync(ct));
+        })
+            .WithSummary("Save a new Gmail app password (encrypted), check it, and send what is waiting.");
+
         return admin;
     }
 }
+
+public sealed record MailSettingsRequest(string? AppPassword);

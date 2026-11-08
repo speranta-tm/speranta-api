@@ -211,6 +211,11 @@ namespace Speranta.Infrastructure.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
 
+                    b.Property<string>("DisplayName")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("display_name");
+
                     b.Property<string>("Email")
                         .IsRequired()
                         .HasMaxLength(254)
@@ -725,6 +730,10 @@ namespace Speranta.Infrastructure.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("id");
 
+                    b.Property<DateTimeOffset?>("LastAlertAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("last_alert_at");
+
                     b.Property<DateTimeOffset?>("LastCheckAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("last_check_at");
@@ -830,6 +839,54 @@ namespace Speranta.Infrastructure.Migrations
                     b.ToTable("outbox_emails", (string)null);
                 });
 
+            modelBuilder.Entity("Speranta.Domain.Entities.PushSubscription", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Auth")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("auth");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("Endpoint")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("endpoint");
+
+                    b.Property<string>("P256dh")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("p256dh");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_push_subscriptions");
+
+                    b.HasIndex("Endpoint")
+                        .IsUnique()
+                        .HasDatabaseName("ix_push_subscriptions_endpoint");
+
+                    b.HasIndex("UserId")
+                        .HasDatabaseName("ix_push_subscriptions_user_id");
+
+                    b.ToTable("push_subscriptions", (string)null);
+                });
+
             modelBuilder.Entity("Speranta.Domain.Entities.ServiceTime", b =>
                 {
                     b.Property<int>("Id")
@@ -911,6 +968,21 @@ namespace Speranta.Infrastructure.Migrations
                         .HasMaxLength(30)
                         .HasColumnType("character varying(30)")
                         .HasColumnName("kids_phone");
+
+                    b.Property<string>("SmtpPasswordProtected")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("smtp_password_protected");
+
+                    b.Property<string>("VapidPrivateKeyProtected")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("vapid_private_key_protected");
+
+                    b.Property<string>("VapidPublicKey")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("vapid_public_key");
 
                     b.HasKey("Id")
                         .HasName("pk_site_settings");
